@@ -22,24 +22,30 @@ COLON="__|::|__|::|__"
 HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
 CLOCKCOUNT=4
 
+FLAG24H=I
+if [[ $1 == "--24hour" ]]; then
+	FLAG24H=H
+	shift
+fi
+
 function show_time {
 	ARGC=$#
 
 	# get time
 	if [[ $ARGC == 0 ]]; then
 		# no arguments, do local
-		time="$(
+		time=$(
 			while read -sn1 char; do
 				printf "${char} "
-			done <<<$(date '+%I:%M:%S %Z')
-		)"
+			done <<<$(date "+%${FLAG24H}:%M:%S %Z")
+		)
 	else
 		ZONEARG=$1
-		time="$(
+		time=$(
 			while read -sn1 char; do
 				printf "${char} "
-			done <<<$(TZ=$ZONEARG date '+%I:%M:%S %Z')
-		)"
+			done <<<$(TZ=$ZONEARG date "+%${FLAG24H}:%M:%S %Z")
+		)
 	fi
 
 	# print out each character
