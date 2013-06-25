@@ -30,7 +30,7 @@ while sleep .1; do
 		time="$(
 			while read -sn1 char; do
 				printf "${char} "
-			done <<<$(date +%I:%M:%S)
+			done <<<$(date '+%I:%M:%S %Z')
 		)"
 
 		dimensions=$(
@@ -59,8 +59,11 @@ while sleep .1; do
 						string="${NUM[${char}]}"
 					;;
 
-					*)
+					[:])
 						string="${COLON}"
+					;;
+					*)
+						string="${char}"
 					;;
 				esac
 				printf "  $(cut -f ${y} -d '|' <<<${string} | sed "s/\(#\+\)/\\${DC}\1/g ; \
