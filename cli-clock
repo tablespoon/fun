@@ -39,8 +39,8 @@ while sleep .1; do
 				cols
 			!
 		)
-		lines=${dimensions%%$'\x0a'*}
-		cols=${dimensions##*$'\x0a'}
+		lines=${dimensions%%$\x0a*}
+		cols=${dimensions##*$\x0a}
 
 		if [[ ${dimensions} != ${dimensions_log} ]]; then
 			dimensions_log=${dimensions}
