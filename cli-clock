@@ -26,13 +26,10 @@ while sleep .1; do
 	if [[ ${SECONDS} == ${seconds_log} ]]; then
 		continue
 	else
+		# track seconds
 		seconds_log=${SECONDS}
-		time="$(
-			while read -sn1 char; do
-				printf "${char} "
-			done <<<$(date '+%I:%M:%S %Z')
-		)"
 
+		# determine screen size
 		dimensions=$(
 			tput -S <<-!
 				lines
@@ -42,6 +39,7 @@ while sleep .1; do
 		lines=${dimensions%%$'\x0a'*}
 		cols=${dimensions##*$'\x0a'}
 
+		# clear for new dimensions
 		if [[ ${dimensions} != ${dimensions_log} ]]; then
 			dimensions_log=${dimensions}
 			clear
@@ -52,6 +50,14 @@ while sleep .1; do
 			civis
 		!
 
+		# get time
+		time="$(
+			while read -sn1 char; do
+				printf "${char} "
+			done <<<$(date '+%I:%M:%S %Z')
+		)"
+
+		# print out each character
 		for (( y=1; ${y} <= ${HEIGHT}; y++ )); do
 			for char in ${time}; do
 				case ${char} in
@@ -79,3 +85,6 @@ while sleep .1; do
 		!
 	fi
 done
+
+function show_time {
+}
