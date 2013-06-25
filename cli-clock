@@ -20,19 +20,68 @@ NUM[${#NUM[@]}]="######|##__##|######|##__##|######"
 NUM[${#NUM[@]}]="######|##__##|######|____##|____##"
 COLON="__|::|__|::|__"
 HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
+CLOCKCOUNT=4
+
+FLAG24H=I
+if [[ $1 == "--24hour" ]]; then
+	FLAG24H=H
+	shift
+fi
+
+function show_time {
+	ARGC=$#
+
+	# get time
+	if [[ $ARGC == 0 ]]; then
+		# no arguments, do local
+		time=$(
+			while read -sn1 char; do
+				printf "${char} "
+			done <<<$(date "+%${FLAG24H}:%M:%S %Z")
+		)
+	else
+		ZONEARG=$1
+		time=$(
+			while read -sn1 char; do
+				printf "${char} "
+			done <<<$(TZ=$ZONEARG date "+%${FLAG24H}:%M:%S %Z")
+		)
+	fi
+
+	# print out each character
+	for (( y=1; ${y} <= ${HEIGHT}; y++ )); do
+		for char in ${time}; do
+			case ${char} in
+				[0-9])
+					string="${NUM[${char}]}"
+				;;
+
+				[:])
+					string="${COLON}"
+				;;
+				*)
+					string="${char}"
+				;;
+			esac
+			printf "  $(cut -f ${y} -d '|' <<<${string} | sed "s/\(#\+\)/\\${DC}\1/g ; \
+									s/\(:\+\)/\\${CC}\1/g ; \
+									s/\(_\+\)/\\${NC}\1/g ; \
+									s/_/ /g")${NC}"
+		done && [[ ${y} != ${HEIGHT} ]] && echo
+	done
+
+	echo "" ; echo ""
+}
 
 while sleep .1; do
 
 	if [[ ${SECONDS} == ${seconds_log} ]]; then
 		continue
 	else
+		# track seconds
 		seconds_log=${SECONDS}
-		time="$(
-			while read -sn1 char; do
-				printf "${char} "
-			done <<<$(date +%I:%M:%S)
-		)"
 
+		# determine screen size
 		dimensions=$(
 			tput -S <<-!
 				lines
@@ -42,33 +91,21 @@ while sleep .1; do
 		lines=${dimensions%%$'\x0a'*}
 		cols=${dimensions##*$'\x0a'}
 
+		# clear for new dimensions
 		if [[ ${dimensions} != ${dimensions_log} ]]; then
 			dimensions_log=${dimensions}
 			clear
 		fi
 
 		tput -S <<-!
-			cup $(( ( lines - HEIGHT ) / 2 )) 0
+			cup $(( ( lines - HEIGHT * CLOCKCOUNT ) / 2 )) 0
 			civis
 		!
 
-		for (( y=1; ${y} <= ${HEIGHT}; y++ )); do
-			for char in ${time}; do
-				case ${char} in
-					[0-9])
-						string="${NUM[${char}]}"
-					;;
-
-					*)
-						string="${COLON}"
-					;;
-				esac
-				printf "  $(cut -f ${y} -d '|' <<<${string} | sed "s/\(#\+\)/\\${DC}\1/g ; \
-										s/\(:\+\)/\\${CC}\1/g ; \
-										s/\(_\+\)/\\${NC}\1/g ; \
-										s/_/ /g")${NC}"
-			done && [[ ${y} != ${HEIGHT} ]] && echo
-		done
+		show_time # local
+		show_time "America/New_York"
+		show_time GMT
+		show_time 'Asia/Singapore'
 
 		[[ $1 == "--hide-cursor" ]] || tput -S <<-!
 			cup ${lines} ${cols}
