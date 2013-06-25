@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TRIALS=10000
+TRIALS=5000 # per core
 PROCS=$(grep -c "^processor[[:space:]]\+:" /proc/cpuinfo)
 
 calc() {
