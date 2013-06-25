@@ -1,0 +1,23 @@
+#!/bin/bash
+
+TRIALS=10000
+PROCS=$(grep -c "^processor[[:space:]]\+:" /proc/cpuinfo)
+
+calc() {
+	for (( i=0; ${i} < ${TRIALS}; i++ )); do
+
+		x=$(bc -l <<<"${RANDOM}/32767")
+		y=$(bc -l <<<"${RANDOM}/32767")
+		z=$(bc -l <<<"${x}^2 + ${y}^2")
+		loc=$(awk '{ if ($1 <= "1") print "in"; else print "out" }' <<<${z})
+
+		((${loc}++))
+	done
+	echo $in
+}
+
+for result in $(for (( proc=0; ${proc} < ${PROCS}; proc++ )); do calc & done); do
+	((results+=${result}))
+done
+
+bc -l <<<"${results}/(${TRIALS}*${PROCS})*4" | sed "s/0\+$//"
