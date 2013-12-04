@@ -1,23 +1,52 @@
 #!/bin/bash
 
-TRIALS=5000 # per core
+LIMIT_METHOD=duration # set this to "quantity" or "duration"
+#LIMIT_METHOD=quantity # set this to "quantity" or "duration"
+TRIAL_LIMIT=10000 # number of trials to evaluate (per core) if LIMIT_METHOD==quantity
+DURATION_LIMIT=30 # duration in seconds to run if LIMIT_METHOD==duration
+CACHE_SIZE=1200 # number of trials to cache before flushing to bc -- used for tuning; 1000 seems near-optimal
+SCALE=10 # scale for bc
+
 PROCS=$(grep -c "^processor[[:space:]]\+:" /proc/cpuinfo)
 
 calc() {
-	for (( i=0; ${i} < ${TRIALS}; i++ )); do
-
-		x=$(bc -l <<<"${RANDOM}/32767")
-		y=$(bc -l <<<"${RANDOM}/32767")
-		z=$(bc -l <<<"${x}^2 + ${y}^2")
-		loc=$(awk '{ if ($1 <= "1") print "in"; else print "out" }' <<<${z})
-
-		((${loc}++))
-	done
-	echo $in
+	case $1 in
+		quantity)
+			while [[ ${counter} -lt ${TRIAL_LIMIT} ]]; do
+				string+="(${RANDOM}/32767)^2+(${RANDOM}/32767)^2<=1;"
+				if [[ $(( ++counter % CACHE_SIZE )) -eq 0 ]]; then
+					echo "$(bc -l <<<"scale=${SCALE};${string}" | grep -c 1):${CACHE_SIZE}"
+					unset string
+				fi
+			done
+		;;
+		duration)
+			while [[ ${SECONDS} -lt ${DURATION_LIMIT} ]]; do
+				string+="(${RANDOM}/32767)^2+(${RANDOM}/32767)^2<=1;"
+				if [[ $(( ++counter % CACHE_SIZE )) -eq 0 ]]; then
+					echo "$(bc -l <<<"scale=${SCALE};${string}" | grep -c 1):${CACHE_SIZE}"
+					unset string
+				fi
+			done
+		;;
+		*)
+			break
+		;;
+	esac
+	[[ -n "${string}" ]] && echo "$(bc -l <<<"scale=${SCALE};${string}" | grep -c 1):$(( counter % CACHE_SIZE ))"
 }
 
-for result in $(for (( proc=0; ${proc} < ${PROCS}; proc++ )); do calc & done); do
-	((results+=${result}))
-done
+parallelCalc() {
+	for (( proc=0; ${proc} < ${PROCS}; proc++ )); do
+		calc ${LIMIT_METHOD} &
+	done
+	wait
+}
 
-bc -l <<<"${results}/(${TRIALS}*${PROCS})*4" | sed "s/0\+$//"
+
+for result in $(parallelCalc); do
+	((results+=${result%:*}))
+	((trials+=${result#*:}))
+done
+echo -ne "Trial count: ${trials}\nPi estimate: "
+bc -l <<<"scale=${SCALE};${results}/(${trials})*4" | sed "s/0\+$//"

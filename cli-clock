@@ -24,25 +24,120 @@ NUM_WIDTH=$(awk -F\| '{ print length($1) }' <<<${NUM[0]})
 COLON_WIDTH=$(awk -F\| '{ print length($1) }' <<<${COLON})
 WIDTH=$(( NUM_WIDTH * 6 + COLON_WIDTH * 2 + SPACE_WIDTH * 7 ))
 HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
+CLOCKCOUNT=4
 
+FLAG24H=I
+if [[ $1 == "--24hour" ]]; then
+	FLAG24H=H
+	shift
+fi
+
+function show_time {
+	ARGC=$#
+
+	# get time
+	if [[ $ARGC == 0 ]]; then
+		# no arguments, do local
+		time=$(
+			while read -sn1 char; do
+				printf "${char} "
+			done <<<$(date "+%${FLAG24H}:%M:%S %Z")
+		)
+	else
+		ZONEARG=$1
+		time=$(
+			while read -sn1 char; do
+				printf "${char} "
+			done <<<$(TZ=$ZONEARG date "+%${FLAG24H}:%M:%S %Z")
+		)
+	fi
+
+	# print out each character
+	for (( y=1; ${y} <= ${HEIGHT}; y++ )); do
+		for char in ${time}; do
+			case ${char} in
+				[0-9])
+					string="${NUM[${char}]}"
+				;;
+
+				[:])
+					string="${COLON}"
+				;;
+				*)
+					string="${char}"
+				;;
+			esac
+			printf "  $(cut -f ${y} -d '|' <<<${string} | sed "s/\(#\+\)/\\${DC}\1/g ; \
+									s/\(:\+\)/\\${CC}\1/g ; \
+									s/\(_\+\)/\\${NC}\1/g ; \
+									s/_/ /g")${NC}"
+		done && [[ ${y} != ${HEIGHT} ]] && echo
+	done
+
+	echo "" ; echo ""
+}
+
+<<<<<<< HEAD
 while sleep ${delay:-0}; do
+=======
+while sleep .1; do
+
+	if [[ ${SECONDS} == ${seconds_log} ]]; then
+		continue
+	else
+		# track seconds
+		seconds_log=${SECONDS}
+
+		# determine screen size
+		dimensions=$(
+			tput -S <<-!
+				lines
+				cols
+			!
+		)
+		lines=${dimensions%%$'\x0a'*}
+		cols=${dimensions##*$'\x0a'}
+
+		# clear for new dimensions
+		if [[ ${dimensions} != ${dimensions_log} ]]; then
+			dimensions_log=${dimensions}
+			clear
+		fi
+>>>>>>> 2c0a7370373d735fd7c5a26f0cc928a6aeee0d68
 
 	# determine terminal size
 	dimensions=$(
 		tput -S <<-!
+<<<<<<< HEAD
 			lines
 			cols
+=======
+			cup $(( ( lines - HEIGHT * CLOCKCOUNT ) / 2 )) 0
+			civis
+>>>>>>> 2c0a7370373d735fd7c5a26f0cc928a6aeee0d68
 		!
 	)
 	# '\x0a' is a newline character
 	lines=${dimensions%%$'\n'*}
 	cols=${dimensions##*$'\n'}
 
+<<<<<<< HEAD
 	# redraw screen if terminal dimensions change
 	if [[ ${dimensions} != ${dimensions_log} ]]; then
 		dimensions_log=${dimensions}
 		clear
 		unset time_log
+=======
+		show_time # local
+		show_time "America/New_York"
+		show_time GMT
+		show_time 'Asia/Singapore'
+
+		[[ $1 == "--hide-cursor" ]] || tput -S <<-!
+			cup ${lines} ${cols}
+			cnorm
+		!
+>>>>>>> 2c0a7370373d735fd7c5a26f0cc928a6aeee0d68
 	fi
 
 	# put the cursor in the correct position to center the clock in the terminal
