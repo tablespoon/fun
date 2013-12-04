@@ -19,60 +19,94 @@ NUM[${#NUM[@]}]="######|____##|____##|____##|____##"
 NUM[${#NUM[@]}]="######|##__##|######|##__##|######"
 NUM[${#NUM[@]}]="######|##__##|######|____##|____##"
 COLON="__|::|__|::|__"
+SPACE_WIDTH=2
+NUM_WIDTH=$(awk -F\| '{ print length($1) }' <<<${NUM[0]})
+COLON_WIDTH=$(awk -F\| '{ print length($1) }' <<<${COLON})
+WIDTH=$(( NUM_WIDTH * 6 + COLON_WIDTH * 2 + SPACE_WIDTH * 7 ))
 HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
 
-while sleep .1; do
+while sleep ${delay:-0}; do
 
-	if [[ ${SECONDS} == ${seconds_log} ]]; then
-		continue
-	else
-		seconds_log=${SECONDS}
-		time="$(
-			while read -sn1 char; do
-				printf "${char} "
-			done <<<$(date +%I:%M:%S)
-		)"
+	# determine terminal size
+	dimensions=$(
+		tput -S <<-!
+			lines
+			cols
+		!
+	)
+	# '\x0a' is a newline character
+	lines=${dimensions%%$'\n'*}
+	cols=${dimensions##*$'\n'}
 
-		dimensions=$(
-			tput -S <<-!
-				lines
-				cols
-			!
-		)
-		lines=${dimensions%%$'\x0a'*}
-		cols=${dimensions##*$'\x0a'}
+	# redraw screen if terminal dimensions change
+	if [[ ${dimensions} != ${dimensions_log} ]]; then
+		dimensions_log=${dimensions}
+		clear
+		unset time_log
+	fi
 
-		if [[ ${dimensions} != ${dimensions_log} ]]; then
-			dimensions_log=${dimensions}
-			clear
+	# put the cursor in the correct position to center the clock in the terminal
+	tput -S <<-!
+		cup $(( (lines-HEIGHT)/2 )) $(( (cols-WIDTH)/2 ))
+		civis
+	!
+
+	# initialize date-reading loop
+	unset forward_movement
+	time_cur=$(date +%I:%M:%S)
+	for (( i=0; ${i}<${#time_cur}; i++ )); do
+
+		char_cur=${time_cur:${i}:1}
+		char_log=${time_log:${i}:1}
+
+		case ${char_cur} in
+			[0-9])
+				string=${NUM[${char_cur}]}
+				char_width=${NUM_WIDTH}
+			;;
+
+			:)
+				string=${COLON}
+				char_width=${COLON_WIDTH}
+			;;
+		esac
+
+		# if the character has changed, redraw it! 
+		if [[ ${char_cur} != ${char_log} ]]; then
+			[[ ${forward_movement} ]] && tput cuf ${forward_movement}
+			unset forward_movement
+			for (( y=1; ${y}<=${HEIGHT}; y++ )); do
+				segment=$(cut -f ${y} -d '|' <<<${string})
+				segment=$(sed "s/\(#\+\)/\\${DC}\1/g;\
+					    s/\(:\+\)/\\${CC}\1/g;\
+					    s/\(_\+\)/\\${NC}\1/g;\
+					    s/_/ /g" <<<${segment}${NC})
+
+				tput sc
+				printf "${segment}"
+				tput -S <<-!
+					rc
+					cud 1
+				!
+			done
+			tput cuu ${HEIGHT}
 		fi
 
-		tput -S <<-!
-			cup $(( ( lines - HEIGHT ) / 2 )) 0
-			civis
-		!
+		(( forward_movement+=${char_width} ))
+		if [[ ${i} -lt $(( ${#time_cur} - 1 )) ]]; then
+			(( forward_movement+=${SPACE_WIDTH} ))
+		fi
 
-		for (( y=1; ${y} <= ${HEIGHT}; y++ )); do
-			for char in ${time}; do
-				case ${char} in
-					[0-9])
-						string="${NUM[${char}]}"
-					;;
+	done
+	time_log=${time_cur}
 
-					*)
-						string="${COLON}"
-					;;
-				esac
-				printf "  $(cut -f ${y} -d '|' <<<${string} | sed "s/\(#\+\)/\\${DC}\1/g ; \
-										s/\(:\+\)/\\${CC}\1/g ; \
-										s/\(_\+\)/\\${NC}\1/g ; \
-										s/_/ /g")${NC}"
-			done && [[ ${y} != ${HEIGHT} ]] && echo
-		done
+	[[ $1 == "--hide-cursor" ]] || tput -S <<-!
+		cup ${lines} 0 
+		cnorm
+	!
 
-		[[ $1 == "--hide-cursor" ]] || tput -S <<-!
-			cup ${lines} ${cols}
-			cnorm
-		!
-	fi
+	# determine how long to sleep before the next update
+	nanoseconds=10#$(date +%N)
+	delay=0.$(( 1000000000 - ${nanoseconds} ))
+
 done
