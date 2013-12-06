@@ -18,15 +18,42 @@ NUM[${#NUM[@]}]="######|##____|######|##__##|######"
 NUM[${#NUM[@]}]="######|____##|____##|____##|____##"
 NUM[${#NUM[@]}]="######|##__##|######|##__##|######"
 NUM[${#NUM[@]}]="######|##__##|######|____##|____##"
+A="_####_|##__##|######|##__##|##__##"
+B="#####_|##__##|#####_|##__##|######"
+C="C|C|C|C|C"
+D="#####_|##__##|##__##|##__##|#####_"
+E="######|##____|######|##____|######"
+F=F
+G=G
+H="##__##|##__##|######|##__##|##__##"
+I="####|_##_|_##_|_##_|####"
+J=J
+K=K
+L=L
+M=M
+N=N
+O=O
+P=P
+Q=Q
+R=R
+S="_#####|##____|_####_|____##|#####_"
+T="######|__##__|__##__|__##__|__##__"
+U=U
+V=V
+W=W
+X=X
+Y=Y
+Z=Z
 COLON="__|::|__|::|__"
+SPACE="__"
 SPACE_WIDTH=2
 NUM_WIDTH=$(awk -F\| '{ print length($1) }' <<<${NUM[0]})
 COLON_WIDTH=$(awk -F\| '{ print length($1) }' <<<${COLON})
-WIDTH=$(( NUM_WIDTH * 6 + COLON_WIDTH * 2 + SPACE_WIDTH * 7 ))
-HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
+CLOCK_WIDTH=$(( NUM_WIDTH * 6 + COLON_WIDTH * 2 + SPACE_WIDTH * 7 ))
+LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
+TIMEZONE=$(awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
 
-while sleep ${delay:-0}; do
-
+screenSetup() {
 	# determine terminal size
 	dimensions=$(
 		tput -S <<-!
@@ -34,7 +61,6 @@ while sleep ${delay:-0}; do
 			cols
 		!
 	)
-	# '\x0a' is a newline character
 	lines=${dimensions%%$'\n'*}
 	cols=${dimensions##*$'\n'}
 
@@ -50,6 +76,62 @@ while sleep ${delay:-0}; do
 		cup $(( (lines-HEIGHT)/2 )) $(( (cols-WIDTH)/2 ))
 		civis
 	!
+}
+
+drawChar() {
+	string=$1
+	string="${!string}"
+	tput sc
+	for (( y=1; ${y}<=${LINE_HEIGHT}; y++ )); do
+		segment=$(cut -f ${y} -d '|' <<<${string})
+		char_width=${#segment}
+		segment=$(sed "s/\(#\+\)/\\${DC}\1/g;\
+				s/\(:\+\)/\\${CC}\1/g;\
+				s/\(_\+\)/\\${NC}\1/g;\
+				s/_/ /g" <<<${segment}${NC})
+
+		printf "${segment}"
+		if [[ ${y} -lt ${LINE_HEIGHT} ]]; then
+			tput -S <<-!
+				cud 1
+				cub ${char_width}
+			!
+		fi
+	done
+	tput -S <<-!
+		rc
+		cuf ${char_width}
+	!
+}
+
+	
+
+getDate() {
+	for i in ${TIMEZONE} ${@}; do
+		TZ=${i} date +"%I:%M:%S %Z"
+	done
+}
+
+#screenSetup
+
+tput -S <<-!
+	clear
+	cup 10 0
+!
+for i in t h i s SPACE i s space a space t e s t; do
+#for i in {a..z}; do
+	drawChar ${i^^}
+	tput cuf ${SPACE_WIDTH}
+done
+tput cup 0 0
+
+getDate Europe/London Asia/Tokyo
+exit
+
+
+while sleep ${delay:-0}; do
+
+	screenSetup
 
 	# initialize date-reading loop
 	unset forward_movement
