@@ -2,50 +2,51 @@
 
 
 DIGIT_COLOR=RED
+LETTER_COLOR=YELLOW
 COLON_COLOR=YELLOW
 
 
 BLACK=0 RED=1 GREEN=2 YELLOW=3 BLUE=4 MAGENTA=5 CYAN=6 WHITE=7
-DC="\e[3${!DIGIT_COLOR};4${!DIGIT_COLOR}m" CC="\e[3${!COLON_COLOR};4${!COLON_COLOR}m" NC="\e[m"
+DC="\e[3${!DIGIT_COLOR};4${!DIGIT_COLOR}m" LC="\e[3${!LETTER_COLOR};4${!LETTER_COLOR}m" CC="\e[3${!COLON_COLOR};4${!COLON_COLOR}m" NC="\e[m"
 
-NUM[${#NUM[@]}]="######|##__##|##__##|##__##|######"
-NUM[${#NUM[@]}]="____##|____##|____##|____##|____##"
-NUM[${#NUM[@]}]="######|____##|######|##____|######"
-NUM[${#NUM[@]}]="######|____##|######|____##|######"
-NUM[${#NUM[@]}]="##__##|##__##|######|____##|____##"
-NUM[${#NUM[@]}]="######|##____|######|____##|######"
-NUM[${#NUM[@]}]="######|##____|######|##__##|######"
-NUM[${#NUM[@]}]="######|____##|____##|____##|____##"
-NUM[${#NUM[@]}]="######|##__##|######|##__##|######"
-NUM[${#NUM[@]}]="######|##__##|######|____##|____##"
-A="_####_|##__##|######|##__##|##__##"
-B="#####_|##__##|#####_|##__##|######"
-C="C|C|C|C|C"
-D="#####_|##__##|##__##|##__##|#####_"
-E="######|##____|######|##____|######"
-F=F
-G=G
-H="##__##|##__##|######|##__##|##__##"
-I="####|_##_|_##_|_##_|####"
-J=J
-K=K
-L=L
-M=M
-N=N
-O=O
-P=P
-Q=Q
-R=R
-S="_#####|##____|_####_|____##|#####_"
-T="######|__##__|__##__|__##__|__##__"
-U=U
-V=V
-W=W
-X=X
-Y=Y
-Z=Z
+NUM[0]="######|##__##|##__##|##__##|######"
+NUM[1]="____##|____##|____##|____##|____##"
+NUM[2]="######|____##|######|##____|######"
+NUM[3]="######|____##|######|____##|######"
+NUM[4]="##__##|##__##|######|____##|____##"
+NUM[5]="######|##____|######|____##|######"
+NUM[6]="######|##____|######|##__##|######"
+NUM[7]="######|____##|____##|____##|____##"
+NUM[8]="######|##__##|######|##__##|######"
+NUM[9]="######|##__##|######|____##|____##"
+A="_AAAA_|AA__AA|AAAAAA|AA__AA|AA__AA"
+B="AAAAA_|AA__AA|AAAAA_|AA__AA|AAAAAA"
+C="_AAAA_|AA__AA|AA____|AA__AA|_AAAA_"
+D="AAAAA_|AA__AA|AA__AA|AA__AA|AAAAA_"
+E="AAAAAA|AA____|AAAAAA|AA____|AAAAAA"
+F="AAAAAA|AA____|AAAA__|AA____|AA____"
+G="_AAAA_|AA____|AA_AAA|AA__AA|_AAAA_"
+H="AA__AA|AA__AA|AAAAAA|AA__AA|AA__AA"
+I="AAAA|_AA_|_AA_|_AA_|AAAA"
+J="___AAA|____AA|____AA|AA__AA|_AAAA_"
+K="AA__AA|AA_AA_|AAAA__|AA_AA_|AA__AA"
+L="AA____|AA____|AA____|AA____|AAAAAA"
+M="AA___AA|AAA_AAA|AAAAAAA|AA_A_AA|AA___AA"
+N="AA__AA|AAA_AA|AAAAAA|AA_AAA|AA__AA"
+O="_AAAA_|AA__AA|AA__AA|AA__AA|_AAAA_"
+P="AAAAAA|AA__AA|AAAAAA|AA____|AA____"
+Q="_AAAA_|AA__AA|AA__AA|AA_AAA|_AAAA_"
+R="AAAAA_|AA__AA|AAAAAA|AA_AA_|AA__AA"
+S="_AAAAA|AA____|_AAAA_|____AA|AAAAA_"
+T="AAAAAA|__AA__|__AA__|__AA__|__AA__"
+U="AA__AA|AA__AA|AA__AA|AA__AA|_AAAA_"
+V="AA__AA|AA__AA|AA__AA|_AAAA_|__AA__"
+W="AA___AA|AA_A_AA|AAAAAAA|AAA_AAA|AA___AA"
+X="AA__AA|_AAAA_|__AA__|_AAAA_|AA__AA"
+Y="AA__AA|AA__AA|_AAAA_|__AA__|__AA__"
+Z="AAAAAA|___AA_|__AA__|_AA___|AAAAAA"
 COLON="__|::|__|::|__"
-SPACE="__"
+SPACE="__|__|__|__|__"
 SPACE_WIDTH=2
 NUM_WIDTH=$(awk -F\| '{ print length($1) }' <<<${NUM[0]})
 COLON_WIDTH=$(awk -F\| '{ print length($1) }' <<<${COLON})
@@ -79,32 +80,42 @@ screenSetup() {
 }
 
 drawChar() {
-	string=$1
-	string="${!string}"
-	tput sc
-	for (( y=1; ${y}<=${LINE_HEIGHT}; y++ )); do
-		segment=$(cut -f ${y} -d '|' <<<${string})
-		char_width=${#segment}
-		segment=$(sed "s/\(#\+\)/\\${DC}\1/g;\
-				s/\(:\+\)/\\${CC}\1/g;\
-				s/\(_\+\)/\\${NC}\1/g;\
-				s/_/ /g" <<<${segment}${NC})
-
-		printf "${segment}"
-		if [[ ${y} -lt ${LINE_HEIGHT} ]]; then
-			tput -S <<-!
-				cud 1
-				cub ${char_width}
-			!
+	local string=$1
+	case ${string} in
+		[a-z])	string=${string^^};;
+		:)	string=COLON;;
+		' ')	string=SPACE;;
+	esac
+	if [[ ${string} =~ [0-9] ]]; then
+		string=${NUM[${string}]}
+	else
+		string=${!string}
+	fi
+	local char_width=${string%%|*}
+	char_width=${#char_width}
+	local newlines=${string//[^|]}
+	newlines=${#newlines}
+	string=${string//#/${DC}#}
+	string=${string//A/${LC}A}
+	string=${string//:/${CC}:}
+	string=${string//_/${NC} }
+	local IFS_OLD="${IFS}"
+	local IFS='|'
+	local i
+	for i in ${string}; do
+		local segments[${#segments[@]}]=${i}
+	done
+	IFS=${IFS_OLD}
+	for (( i=0; ${i} <= ${#segments[@]}; i++ )); do
+		segment=${segments[${i}]}${NC}
+		if [[ ${i} -lt ${newlines} ]]; then
+			printf "${segment}\f\033[${char_width}D"
+		else
+			printf "${segment}"
 		fi
 	done
-	tput -S <<-!
-		rc
-		cuf ${char_width}
-	!
+	printf "\033[${newlines}A"
 }
-
-	
 
 getDate() {
 	for i in ${TIMEZONE} ${@}; do
@@ -118,9 +129,32 @@ tput -S <<-!
 	clear
 	cup 10 0
 !
-for i in t h i s SPACE i s space a space t e s t; do
-#for i in {a..z}; do
+
+date=$(getDate)
+loops=${#date}
+for (( i=0; i<${loops}; i++ )); do
+	drawChar "${date:0:1}"
+	date=${date:1}
+	[[ ${date} ]] && printf "\033[${SPACE_WIDTH}C"
+done
+exit
+
+#getDate | while read -sn1 char; do
+#	drawChar ${char^^}
+#done
+
+
+#exit
+
+#for i in t h i s SPACE i s space a space t e s t; do
+time for i in {0..9}; do
 	drawChar ${i^^}
+	tput cuf ${SPACE_WIDTH}
+done
+tput cup 20 0
+exit
+time for i in {a..z}; do
+	drawChar2 ${i^^}
 	tput cuf ${SPACE_WIDTH}
 done
 tput cup 0 0
