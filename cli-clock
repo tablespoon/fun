@@ -7,7 +7,10 @@ COLON_COLOR=YELLOW
 
 
 BLACK=0 RED=1 GREEN=2 YELLOW=3 BLUE=4 MAGENTA=5 CYAN=6 WHITE=7
-DC="\e[3${!DIGIT_COLOR};4${!DIGIT_COLOR}m" LC="\e[3${!LETTER_COLOR};4${!LETTER_COLOR}m" CC="\e[3${!COLON_COLOR};4${!COLON_COLOR}m" NC="\e[m"
+DC="\e[3${!DIGIT_COLOR};4${!DIGIT_COLOR}m"
+LC="\e[3${!LETTER_COLOR};4${!LETTER_COLOR}m"
+CC="\e[3${!COLON_COLOR};4${!COLON_COLOR}m"
+NC="\e[m"
 
 NUM[0]="######|##__##|##__##|##__##|######"
 NUM[1]="____##|____##|____##|____##|____##"
@@ -46,11 +49,12 @@ X="AA__AA|_AAAA_|__AA__|_AAAA_|AA__AA"
 Y="AA__AA|AA__AA|_AAAA_|__AA__|__AA__"
 Z="AAAAAA|___AA_|__AA__|_AA___|AAAAAA"
 COLON="__|::|__|::|__"
+COMMA="__|__|__|::|_:"
+EXCLEMATION="::|::|::|__|::"
+PERIOD="__|__|__|__|::"
+SEMICOLON="__|::|__|::|_:"
 SPACE="__|__|__|__|__"
 SPACE_WIDTH=2
-NUM_WIDTH=$(awk -F\| '{ print length($1) }' <<<${NUM[0]})
-COLON_WIDTH=$(awk -F\| '{ print length($1) }' <<<${COLON})
-CLOCK_WIDTH=$(( NUM_WIDTH * 6 + COLON_WIDTH * 2 + SPACE_WIDTH * 7 ))
 LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
 TIMEZONE=$(awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
 
@@ -73,10 +77,17 @@ screenSetup() {
 	fi
 
 	# put the cursor in the correct position to center the clock in the terminal
-	tput -S <<-!
-		cup $(( (lines-HEIGHT)/2 )) $(( (cols-WIDTH)/2 ))
-		civis
-	!
+	start_row=$(( (lines-HEIGHT)/2 ))
+	start_col=$(( (cols-WIDTH)/2 ))
+	start_row=2
+	start_col=$(( ${SPACE_WIDTH} + 1 ))
+#	tput -S <<-!
+#		cup ${start_row} ${start_col}
+#		civis
+#	!
+	vert_offset=0
+	printf "\E[$((${start_row}+${vert_offset}));${start_col}f"
+	space_on_line=$(( cols - start_col ))
 }
 
 drawChar() {
@@ -84,6 +95,10 @@ drawChar() {
 	case ${string} in
 		[a-z])	string=${string^^};;
 		:)	string=COLON;;
+		,)	string=COMMA;;
+		!)	string=EXCLEMATION;;
+		.)	string=PERIOD;;
+		\;)	string=SEMICOLON;;
 		' ')	string=SPACE;;
 	esac
 	if [[ ${string} =~ [0-9] ]]; then
@@ -93,6 +108,11 @@ drawChar() {
 	fi
 	local char_width=${string%%|*}
 	char_width=${#char_width}
+	if [[ ${char_width} -gt ${space_on_line} ]]; then
+		(( vert_offset+=$(( LINE_HEIGHT + 1 )) ))
+		printf "\E[$(( ${start_row} + ${vert_offset} ));${start_col}f"
+		space_on_line=$(( cols - start_col ))
+	fi
 	local newlines=${string//[^|]}
 	newlines=${#newlines}
 	string=${string//#/${DC}#}
@@ -109,12 +129,14 @@ drawChar() {
 	for (( i=0; ${i} <= ${#segments[@]}; i++ )); do
 		segment=${segments[${i}]}${NC}
 		if [[ ${i} -lt ${newlines} ]]; then
-			printf "${segment}\f\033[${char_width}D"
+			printf "${segment}\E[${char_width}D\E[1B"
 		else
 			printf "${segment}"
 		fi
 	done
-	printf "\033[${newlines}A"
+	printf "\E[${SPACE_WIDTH}C\E[${newlines}A"
+	# keep track of remaining space on the current line
+	(( space_on_line-=$(( ${char_width} + ${SPACE_WIDTH} )) ))
 }
 
 getDate() {
@@ -123,21 +145,28 @@ getDate() {
 	done
 }
 
-#screenSetup
+end() {
+	printf "\n%.0s" $(eval echo {0..${LINE_HEIGHT}})
+	exit
+}
 
-tput -S <<-!
-	clear
-	cup 10 0
-!
+screenSetup
+
+#tput -S <<-!
+#	clear
+#	cup 10 0
+#!
 
 date=$(getDate)
+date="$@"
 loops=${#date}
 for (( i=0; i<${loops}; i++ )); do
 	drawChar "${date:0:1}"
 	date=${date:1}
-	[[ ${date} ]] && printf "\033[${SPACE_WIDTH}C"
+	#[[ ${date} ]] && printf "\033[${SPACE_WIDTH}C"
 done
-exit
+end
+#exit
 
 #getDate | while read -sn1 char; do
 #	drawChar ${char^^}
@@ -147,12 +176,12 @@ exit
 #exit
 
 #for i in t h i s SPACE i s space a space t e s t; do
-time for i in {0..9}; do
+for i in {a..z}; do
 	drawChar ${i^^}
-	tput cuf ${SPACE_WIDTH}
+#	tput cuf ${SPACE_WIDTH}
 done
-tput cup 20 0
-exit
+#tput cup 20 0
+end
 time for i in {a..z}; do
 	drawChar2 ${i^^}
 	tput cuf ${SPACE_WIDTH}
