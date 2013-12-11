@@ -75,7 +75,6 @@ screenSetup() {
 	if [[ ${dimensions} != ${dimensions_log} ]]; then
 		dimensions_log=${dimensions}
 		clear
-		unset time_log
 	fi
 
 	# put the cursor in the correct position to center the clock in the terminal
@@ -185,95 +184,6 @@ while sleep ${delay:-0}; do
 
 	printString "${@:-${date}}"
 	[[ ${@} ]] && end
-
-	# determine how long to sleep before the next update
-	nanoseconds=10#$(date +%N)
-	delay=0.$(( 1000000000 - ${nanoseconds} ))
-
-done
-#exit
-
-#getDate | while read -sn1 char; do
-#	drawChar ${char^^}
-#done
-
-
-#exit
-
-#for i in t h i s SPACE i s space a space t e s t; do
-for i in {a..z}; do
-	drawChar ${i^^}
-#	tput cuf ${SPACE_WIDTH}
-done
-#tput cup 20 0
-end
-time for i in {a..z}; do
-	drawChar2 ${i^^}
-	tput cuf ${SPACE_WIDTH}
-done
-tput cup 0 0
-
-getDate 
-exit
-
-
-while sleep ${delay:-0}; do
-
-	screenSetup
-
-	# initialize date-reading loop
-	unset forward_movement
-	time_cur=$(date +%I:%M:%S)
-	for (( i=0; ${i}<${#time_cur}; i++ )); do
-
-		char_cur=${time_cur:${i}:1}
-		char_log=${time_log:${i}:1}
-
-		case ${char_cur} in
-			[0-9])
-				string=${NUM[${char_cur}]}
-				char_width=${NUM_WIDTH}
-			;;
-
-			:)
-				string=${COLON}
-				char_width=${COLON_WIDTH}
-			;;
-		esac
-
-		# if the character has changed, redraw it! 
-		if [[ ${char_cur} != ${char_log} ]]; then
-			[[ ${forward_movement} ]] && tput cuf ${forward_movement}
-			unset forward_movement
-			for (( y=1; ${y}<=${HEIGHT}; y++ )); do
-				segment=$(cut -f ${y} -d '|' <<<${string})
-				segment=$(sed "s/\(#\+\)/\\${DC}\1/g;\
-					    s/\(:\+\)/\\${CC}\1/g;\
-					    s/\(_\+\)/\\${NC}\1/g;\
-					    s/_/ /g" <<<${segment}${NC})
-
-				tput sc
-				printf "${segment}"
-				tput -S <<-!
-					rc
-					cud 1
-				!
-			done
-			tput cuu ${HEIGHT}
-		fi
-
-		(( forward_movement+=${char_width} ))
-		if [[ ${i} -lt $(( ${#time_cur} - 1 )) ]]; then
-			(( forward_movement+=${SPACE_WIDTH} ))
-		fi
-
-	done
-	time_log=${time_cur}
-
-	[[ $1 == "--hide-cursor" ]] || tput -S <<-!
-		cup ${lines} 0 
-		cnorm
-	!
 
 	# determine how long to sleep before the next update
 	nanoseconds=10#$(date +%N)
