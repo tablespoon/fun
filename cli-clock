@@ -54,6 +54,7 @@ EXCLEMATION="::|::|::|__|::"
 PERIOD="__|__|__|__|::"
 SEMICOLON="__|::|__|::|_:"
 SPACE="__|__|__|__|__"
+NEWLINE="NEWLINE"
 SPACE_WIDTH=2
 LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
 TIMEZONE=$(awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
@@ -81,10 +82,7 @@ screenSetup() {
 	start_col=$(( (cols-WIDTH)/2 ))
 	start_row=2
 	start_col=$(( ${SPACE_WIDTH} + 1 ))
-#	tput -S <<-!
-#		cup ${start_row} ${start_col}
-#		civis
-#	!
+	tput civis
 	vert_offset=0
 	printf "\E[$((${start_row}+${vert_offset}));${start_col}f"
 	space_on_line=$(( cols - start_col ))
@@ -100,6 +98,7 @@ drawChar() {
 		.)	string=PERIOD;;
 		\;)	string=SEMICOLON;;
 		' ')	string=SPACE;;
+		$'\n')	string=NEWLINE;;
 	esac
 	if [[ ${string} =~ [0-9] ]]; then
 		string=${NUM[${string}]}
@@ -108,10 +107,11 @@ drawChar() {
 	fi
 	local char_width=${string%%|*}
 	char_width=${#char_width}
-	if [[ ${char_width} -gt ${space_on_line} ]]; then
+	if [[ ${char_width} -gt ${space_on_line} || ${string} == "NEWLINE" ]]; then
 		(( vert_offset+=$(( LINE_HEIGHT + 1 )) ))
 		printf "\E[$(( ${start_row} + ${vert_offset} ));${start_col}f"
 		space_on_line=$(( cols - start_col ))
+		[[ ${string} == "NEWLINE" ]] && return
 	fi
 	local newlines=${string//[^|]}
 	newlines=${#newlines}
@@ -146,26 +146,26 @@ getDate() {
 }
 
 end() {
-	printf "\n%.0s" $(eval echo {0..${LINE_HEIGHT}})
+	printf "\n%.s" $(eval echo {0..${LINE_HEIGHT}})
 	exit
 }
 
-screenSetup
+while sleep ${delay:-0}; do
+	screenSetup
 
-#tput -S <<-!
-#	clear
-#	cup 10 0
-#!
+	date="$(getDate Europe/London Asia/Tokyo)"
+	loops=${#date}
+	for (( i=0; i<${loops}; i++ )); do
+		drawChar "${date:0:1}"
+		date=${date:1}
+		#[[ ${date} ]] && printf "\033[${SPACE_WIDTH}C"
+	done
 
-date=$(getDate)
-date="$@"
-loops=${#date}
-for (( i=0; i<${loops}; i++ )); do
-	drawChar "${date:0:1}"
-	date=${date:1}
-	#[[ ${date} ]] && printf "\033[${SPACE_WIDTH}C"
+	# determine how long to sleep before the next update
+	nanoseconds=10#$(date +%N)
+	delay=0.$(( 1000000000 - ${nanoseconds} ))
+
 done
-end
 #exit
 
 #getDate | while read -sn1 char; do
@@ -188,7 +188,7 @@ time for i in {a..z}; do
 done
 tput cup 0 0
 
-getDate Europe/London Asia/Tokyo
+getDate 
 exit
 
 
