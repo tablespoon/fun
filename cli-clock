@@ -5,6 +5,7 @@ DIGIT_COLOR=RED
 LETTER_COLOR=YELLOW
 COLON_COLOR=YELLOW
 
+TIMEZONES="America/New_York Europe/London Asia/Baghdad Asia/Singapore Asia/Tokyo"
 
 BLACK=0 RED=1 GREEN=2 YELLOW=3 BLUE=4 MAGENTA=5 CYAN=6 WHITE=7
 DC="\e[3${!DIGIT_COLOR};4${!DIGIT_COLOR}m"
@@ -57,7 +58,7 @@ SPACE="__|__|__|__|__"
 NEWLINE="NEWLINE"
 SPACE_WIDTH=2
 LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
-TIMEZONE=$(awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
+LOCAL_TIMEZONE=$(awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
 
 screenSetup() {
 	# determine terminal size
@@ -84,41 +85,50 @@ screenSetup() {
 	start_col=$(( ${SPACE_WIDTH} + 1 ))
 	tput civis
 	vert_offset=0
+	unset char_log
 	printf "\E[$((${start_row}+${vert_offset}));${start_col}f"
 	space_on_line=$(( cols - start_col ))
 }
 
 drawChar() {
-	local string=$1
-	case ${string} in
-		[a-z])	string=${string^^};;
-		:)	string=COLON;;
-		,)	string=COMMA;;
-		!)	string=EXCLEMATION;;
-		.)	string=PERIOD;;
-		\;)	string=SEMICOLON;;
-		' ')	string=SPACE;;
-		$'\n')	string=NEWLINE;;
-	esac
-	if [[ ${string} =~ [0-9] ]]; then
-		string=${NUM[${string}]}
-	else
-		string=${!string}
-	fi
-	local char_width=${string%%|*}
-	char_width=${#char_width}
+	local string="$1"
+
+	#deciper string
+        case ${string} in
+                [a-z])  string=${string^^};;
+                :)      string=COLON;;
+                ,)      string=COMMA;;
+                !)      string=EXCLEMATION;;
+                .)      string=PERIOD;;
+                \;)     string=SEMICOLON;;
+                ' ')    string=SPACE;;
+                $'\n')  string=NEWLINE;;
+        esac
+        if [[ ${string} =~ [0-9] ]]; then
+                string=${NUM[${string}]}
+        else
+                string=${!string}
+        fi
+        char_width=${string%%|*}
+        char_width=${#char_width}
+	newlines=${string//[^|]}
+	newlines=${#newlines}
+
+	# newline check
 	if [[ ${char_width} -gt ${space_on_line} || ${string} == "NEWLINE" ]]; then
 		(( vert_offset+=$(( LINE_HEIGHT + 1 )) ))
 		printf "\E[$(( ${start_row} + ${vert_offset} ));${start_col}f"
 		space_on_line=$(( cols - start_col ))
 		[[ ${string} == "NEWLINE" ]] && return
 	fi
-	local newlines=${string//[^|]}
-	newlines=${#newlines}
+
+	# apply formatting
 	string=${string//#/${DC}#}
 	string=${string//A/${LC}A}
 	string=${string//:/${CC}:}
 	string=${string//_/${NC} }
+
+	# load string into array, one element per row
 	local IFS_OLD="${IFS}"
 	local IFS='|'
 	local i
@@ -126,40 +136,55 @@ drawChar() {
 		local segments[${#segments[@]}]=${i}
 	done
 	IFS=${IFS_OLD}
+
+	# print the character
 	for (( i=0; ${i} <= ${#segments[@]}; i++ )); do
 		segment=${segments[${i}]}${NC}
+		printf "${segment}"
+		# for all but the last line, move the cursor left and down
 		if [[ ${i} -lt ${newlines} ]]; then
-			printf "${segment}\E[${char_width}D\E[1B"
-		else
-			printf "${segment}"
+			printf "\E[${char_width}D\E[1B"
 		fi
 	done
+	# after the last line, move cursor right and up to prepare for next character
 	printf "\E[${SPACE_WIDTH}C\E[${newlines}A"
 	# keep track of remaining space on the current line
 	(( space_on_line-=$(( ${char_width} + ${SPACE_WIDTH} )) ))
 }
 
+printString() {
+	local string="${@}"
+	while [[ ${string} ]]; do
+		# print the first character in ${string}
+		local char="${string:0:1}"
+		drawChar "${char}"
+		# remove the character we printed from ${string}
+		string=${string:1}
+	done
+}
+
 getDate() {
-	for i in ${TIMEZONE} ${@}; do
-		TZ=${i} date +"%I:%M:%S %Z"
+	for i in ${LOCAL_TIMEZONE} ${@}; do
+		TZ=${i} date +"%H:%M:%S %Z"
 	done
 }
 
 end() {
+	# put cursor below any output, make it visibile, and exit
 	printf "\n%.s" $(eval echo {0..${LINE_HEIGHT}})
+	tput cvvis
 	exit
 }
+
+trap end SIGHUP SIGINT SIGTERM
 
 while sleep ${delay:-0}; do
 	screenSetup
 
-	date="$(getDate Europe/London Asia/Tokyo)"
-	loops=${#date}
-	for (( i=0; i<${loops}; i++ )); do
-		drawChar "${date:0:1}"
-		date=${date:1}
-		#[[ ${date} ]] && printf "\033[${SPACE_WIDTH}C"
-	done
+	date="$(getDate ${TIMEZONES})"
+
+	printString "${@:-${date}}"
+	[[ ${@} ]] && end
 
 	# determine how long to sleep before the next update
 	nanoseconds=10#$(date +%N)
