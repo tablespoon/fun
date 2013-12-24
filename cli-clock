@@ -49,6 +49,7 @@ W="AA___AA|AA_A_AA|AAAAAAA|AAA_AAA|AA___AA"
 X="AA__AA|_AAAA_|__AA__|_AAAA_|AA__AA"
 Y="AA__AA|AA__AA|_AAAA_|__AA__|__AA__"
 Z="AAAAAA|___AA_|__AA__|_AA___|AAAAAA"
+INDENT="________|________|________|________|________"
 COLON="__|::|__|::|__"
 COMMA="__|__|__|::|_:"
 EXCLEMATION="::|::|::|__|::"
@@ -85,7 +86,7 @@ screenSetup() {
 	tput civis
 	vert_offset=0
 	unset char_log
-	printf "\E[$((${start_row}+${vert_offset}));${start_col}f"
+	printf "\E[$(( ${start_row} + ${vert_offset} ));${start_col}f"
 	space_on_line=$(( cols - start_col ))
 }
 
@@ -101,6 +102,7 @@ drawChar() {
                 .)      string=PERIOD;;
                 \;)     string=SEMICOLON;;
                 ' ')    string=SPACE;;
+		'>')	string=INDENT;;
                 $'\n')  string=NEWLINE;;
         esac
         if [[ ${string} =~ [0-9] ]]; then
@@ -138,15 +140,19 @@ drawChar() {
 
 	# print the character
 	for (( i=0; ${i} <= ${#segments[@]}; i++ )); do
+
 		segment=${segments[${i}]}${NC}
 		printf "${segment}"
+
 		# for all but the last line, move the cursor left and down
 		if [[ ${i} -lt ${newlines} ]]; then
 			printf "\E[${char_width}D\E[1B"
 		fi
 	done
+
 	# after the last line, move cursor right and up to prepare for next character
 	printf "\E[${SPACE_WIDTH}C\E[${newlines}A"
+
 	# keep track of remaining space on the current line
 	(( space_on_line-=$(( ${char_width} + ${SPACE_WIDTH} )) ))
 }
@@ -173,7 +179,7 @@ getDate() {
 
 	DATE_STRING="%I:%M %Z"
 	for i in ${@}; do
-		printf "   "
+		printf ">"
 		TZ=${i} date +"${DATE_STRING}"
 	done
 }
