@@ -74,7 +74,7 @@ screenSetup() {
 	# redraw screen if terminal dimensions change or key pressed
 	if [[ ${dimensions} != ${dimensions_log} ]]; then
 		dimensions_log=${dimensions}
-		clear
+		printf "\Ec" # clear terminal
 	fi
 
 	# put the cursor in the correct position to center the clock in the terminal
@@ -163,8 +163,18 @@ printString() {
 }
 
 getDate() {
-	for i in ${LOCAL_TIMEZONE} ${@}; do
-		TZ=${i} date +"%H:%M:%S %Z"
+	if [[ ${@} ]]; then
+		DATE_STRING="%H:%M:%S %Z"
+	else
+		DATE_STRING="%I:%M:%S"
+	fi
+	TZ=${LOCAL_TIMEZONE} date +"${DATE_STRING}"
+
+
+	DATE_STRING="%I:%M %Z"
+	for i in ${@}; do
+		printf "   "
+		TZ=${i} date +"${DATE_STRING}"
 	done
 }
 
@@ -177,9 +187,8 @@ end() {
 
 trap end SIGHUP SIGINT SIGTERM
 
-#while sleep ${delay:-0}; do
+# Main Loop
 while sleep ${delay:-0}; do
-
 	screenSetup
 
 	date="$(getDate ${TIMEZONES})"
@@ -190,5 +199,4 @@ while sleep ${delay:-0}; do
 	# determine how long to sleep before the next update
 	nanoseconds=10#$(date +%N)
 	delay=0.$(( 1000000000 - ${nanoseconds} ))
-
 done
