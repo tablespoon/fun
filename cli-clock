@@ -3,14 +3,14 @@
 
 DIGIT_COLOR=RED
 LETTER_COLOR=YELLOW
-COLON_COLOR=YELLOW
+PUNCT_COLOR=YELLOW
 
-TIMEZONES="America/New_York Europe/London Asia/Baghdad Asia/Singapore Asia/Tokyo"
+#TIMEZONES="America/New_York Europe/London Asia/Baghdad Asia/Singapore Asia/Tokyo"
 
 BLACK=0 RED=1 GREEN=2 YELLOW=3 BLUE=4 MAGENTA=5 CYAN=6 WHITE=7
 DC="\e[3${!DIGIT_COLOR};4${!DIGIT_COLOR}m"
 LC="\e[3${!LETTER_COLOR};4${!LETTER_COLOR}m"
-CC="\e[3${!COLON_COLOR};4${!COLON_COLOR}m"
+PC="\e[3${!PUNCT_COLOR};4${!PUNCT_COLOR}m"
 NC="\e[m"
 
 NUM[0]="######|##__##|##__##|##__##|######"
@@ -61,6 +61,51 @@ SPACE_WIDTH=2
 LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
 LOCAL_TIMEZONE=$(awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
 
+
+initStrings() {
+	local string_name
+	for string_name in {0..9} {A..Z} ':' ',' '!' '.' ';' ' ' '>' $'\n'; do
+		case ${string_name} in
+			[a-z])  string_name=${string_name^^};;
+			:)      string_name=COLON;;
+			,)      string_name=COMMA;;
+			!)      string_name=EXCLEMATION;;
+			.)      string_name=PERIOD;;
+			\;)     string_name=SEMICOLON;;
+			' ')    string_name=SPACE;;
+			'>')	string_name=INDENT;;
+			$'\n')  string_name=NEWLINE;;
+		esac
+		string_names+=("${string_name}")
+
+
+		
+		local string
+		if [[ ${string_name} =~ [0-9] ]]; then
+			string=${NUM[${string_name}]}
+		else
+			string=${!string_name}
+		fi
+
+		local char_width=$(cut -f 1 -d '|' <<<${string})
+		char_width=${#char_width}
+		char_widths+=("${char_width}")
+
+		local movement='\\e['${char_width}'D\\e[1B'
+
+		# bash has memory leaks when using parameter substitution, so sed is employed instead
+		string=$(sed "s/\(#\+\)/\\${DC}\1\\${NC}/g;\
+			      s/\(A\+\)/\\${LC}\1\\${NC}/g;\
+			      s/\(:\+\)/\\${PC}\1\\${NC}/g;\
+			      s/_/ /g;\
+			      s/|/\\${movement}/g" <<<${string}
+			)
+		
+		strings+=("${string}")
+	done
+}
+
+
 screenSetup() {
 	# determine terminal size
 	dimensions=$(
@@ -76,86 +121,60 @@ screenSetup() {
 	if [[ ${dimensions} != ${dimensions_log} ]]; then
 		dimensions_log=${dimensions}
 		printf "\Ec" # clear terminal
+		tput civis
 	fi
 
 	# put the cursor in the correct position to center the clock in the terminal
-	start_row=$(( (lines-HEIGHT)/2 ))
-	start_col=$(( (cols-WIDTH)/2 ))
+	start_row=$(( ( lines - HEIGHT ) / 2 ))
+	start_col=$(( ( cols - WIDTH ) / 2 ))
 	start_row=2
-	start_col=$(( ${SPACE_WIDTH} + 1 ))
-	tput civis
+	start_col=$(( SPACE_WIDTH + 1 ))
 	vert_offset=0
-	unset char_log
-	printf "\E[$(( ${start_row} + ${vert_offset} ));${start_col}f"
+	printf "\E[$(( start_row + vert_offset ));${start_col}f"
 	space_on_line=$(( cols - start_col ))
 }
 
-drawChar() {
-	local string="$1"
 
-	#deciper string
-        case ${string} in
-                [a-z])  string=${string^^};;
-                :)      string=COLON;;
-                ,)      string=COMMA;;
-                !)      string=EXCLEMATION;;
-                .)      string=PERIOD;;
-                \;)     string=SEMICOLON;;
-                ' ')    string=SPACE;;
-		'>')	string=INDENT;;
-                $'\n')  string=NEWLINE;;
+drawChar() {
+	local char="$1"
+
+	# translate string
+        case ${char} in
+                [a-z])  char=${char^^};;
+                :)      char=COLON;;
+                ,)      char=COMMA;;
+                !)      char=EXCLEMATION;;
+                .)      char=PERIOD;;
+                \;)     char=SEMICOLON;;
+                ' ')    char=SPACE;;
+		'>')	char=INDENT;;
+                $'\n')  char=NEWLINE;;
         esac
-        if [[ ${string} =~ [0-9] ]]; then
-                string=${NUM[${string}]}
-        else
-                string=${!string}
-        fi
-        char_width=${string%%|*}
-        char_width=${#char_width}
-	newlines=${string//[^|]}
-	newlines=${#newlines}
+
+	local i
+	for (( i=0; ${i} < ${#string_names[@]}; i++ )); do
+		if [[ "${string_names[${i}]}" == "${char}" ]]; then
+			local string="${strings[${i}]}"
+			local char_width=${char_widths[${i}]}
+			break
+		fi
+	done
 
 	# newline check
 	if [[ ${char_width} -gt ${space_on_line} || ${string} == "NEWLINE" ]]; then
 		(( vert_offset+=$(( LINE_HEIGHT + 1 )) ))
-		printf "\E[$(( ${start_row} + ${vert_offset} ));${start_col}f"
+		printf "\E[$(( start_row + vert_offset ));${start_col}f"
 		space_on_line=$(( cols - start_col ))
 		[[ ${string} == "NEWLINE" ]] && return
 	fi
 
-	# apply formatting
-	string=${string//#/${DC}#}
-	string=${string//A/${LC}A}
-	string=${string//:/${CC}:}
-	string=${string//_/${NC} }
-
-	# load string into array, one element per row
-	local IFS_OLD="${IFS}"
-	local IFS='|'
-	local i
-	for i in ${string}; do
-		local segments[${#segments[@]}]=${i}
-	done
-	IFS=${IFS_OLD}
-
-	# print the character
-	for (( i=0; ${i} <= ${#segments[@]}; i++ )); do
-
-		segment=${segments[${i}]}${NC}
-		printf "${segment}"
-
-		# for all but the last line, move the cursor left and down
-		if [[ ${i} -lt ${newlines} ]]; then
-			printf "\E[${char_width}D\E[1B"
-		fi
-	done
-
-	# after the last line, move cursor right and up to prepare for next character
-	printf "\E[${SPACE_WIDTH}C\E[${newlines}A"
+	# after the formatted character, and move cursor right and up to prepare for next character
+	printf "${string}\e[${SPACE_WIDTH}C\e[4A"
 
 	# keep track of remaining space on the current line
 	(( space_on_line-=$(( ${char_width} + ${SPACE_WIDTH} )) ))
 }
+
 
 printString() {
 	local string="${@}"
@@ -164,25 +183,29 @@ printString() {
 		local char="${string:0:1}"
 		drawChar "${char}"
 		# remove the character we printed from ${string}
-		string=${string:1}
+		string="${string:1}"
 	done
 }
+
 
 getDate() {
-	if [[ ${@} ]]; then
-		DATE_STRING="%H:%M:%S %Z"
+	local TZ
+	if [[ ! ${@} ]]; then
+		local date_string="%I:%M:%S"
+		TZ=${LOCAL_TIMEZONE} date +"${date_string}"
 	else
-		DATE_STRING="%I:%M:%S"
+		local date_string="%H:%M:%S %Z"
+		TZ=${LOCAL_TIMEZONE} date +"${date_string}"
+
+		date_string="%I:%M %Z"
+		local i
+		for i in ${@}; do
+			printf ">"
+			TZ=${i} date +"${date_string}"
+		done
 	fi
-	TZ=${LOCAL_TIMEZONE} date +"${DATE_STRING}"
-
-
-	DATE_STRING="%I:%M %Z"
-	for i in ${@}; do
-		printf ">"
-		TZ=${i} date +"${DATE_STRING}"
-	done
 }
+
 
 end() {
 	# put cursor below any output, make it visibile, and exit
@@ -191,7 +214,11 @@ end() {
 	exit
 }
 
+
+
 trap end SIGHUP SIGINT SIGTERM
+
+initStrings
 
 # Main Loop
 while sleep ${delay:-0}; do
