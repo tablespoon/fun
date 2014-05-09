@@ -117,7 +117,7 @@ screenSetup() {
 	lines=${dimensions%%$'\n'*}
 	cols=${dimensions##*$'\n'}
 
-	# redraw screen if terminal dimensions change or key pressed
+	# redraw screen if terminal dimensions change
 	if [[ ${dimensions} != ${dimensions_log} ]]; then
 		dimensions_log=${dimensions}
 		printf "\Ec" # clear terminal

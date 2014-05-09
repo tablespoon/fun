@@ -2,8 +2,8 @@
 
 LIMIT_METHOD=duration # set this to "quantity" or "duration"
 #LIMIT_METHOD=quantity # set this to "quantity" or "duration"
-TRIAL_LIMIT=10000 # number of trials to evaluate (per core) if LIMIT_METHOD==quantity
-DURATION_LIMIT=30 # duration in seconds to run if LIMIT_METHOD==duration
+TRIAL_LIMIT=100 # number of trials to evaluate (per core) if LIMIT_METHOD==quantity
+DURATION_LIMIT=15 # duration in seconds to run if LIMIT_METHOD==duration
 CACHE_SIZE=1200 # number of trials to cache before flushing to bc -- used for tuning; 1000 seems near-optimal
 SCALE=10 # scale for bc
 
@@ -13,7 +13,7 @@ calc() {
 	case $1 in
 		quantity)
 			while [[ ${counter} -lt ${TRIAL_LIMIT} ]]; do
-				string+="(${RANDOM}/32767)^2+(${RANDOM}/32767)^2<=1;"
+				string+="(${RANDOM}/32768)^2+(${RANDOM}/32768)^2<=1;"
 				if [[ $(( ++counter % CACHE_SIZE )) -eq 0 ]]; then
 					echo "$(bc -l <<<"scale=${SCALE};${string}" | grep -c 1):${CACHE_SIZE}"
 					unset string

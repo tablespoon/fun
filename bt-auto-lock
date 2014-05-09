@@ -12,21 +12,21 @@ LOG_FILE="$HOME/.${SCRIPT_NAME}.log"
 
 
 # Ensure only THIS instance of the script is running
-for pid in $(pidof -xo $$ ${SCRIPT_NAME} 2>/dev/null); do
-	OTHER_PIDS+=" $(pstree -Apl ${pid} | sed -r 's/[^)]*\(//g; s/\)/ /g' | xargs echo)"
+for pid in $(pidof -xo $$ $SCRIPT_NAME 2>/dev/null); do
+	other_pids+=" $(pstree -Apl $pid | sed -r 's/[^)]*\(//g; s/\)/ /g' | xargs echo)"
 done
-[[ ${OTHER_PIDS} ]] && kill ${OTHER_PIDS} &>/dev/null
+[[ $other_pids ]] && kill $other_pids &>/dev/null
 
 
 log() { # input is a string // log input, rotating log daily
-	[[ ! -e "${LOG_FILE}" ]] && >${LOG_FILE}
+	[[ ! -e "$LOG_FILE" ]] && >"$LOG_FILE"
 	day=$(date +%A)
-	if [[ ${day} != ${day_log} ]]; then
-		day_log=${day}
-		rm -f ${LOG_FILE}.gz
-		gzip ${LOG_FILE}
+	if [[ $day != $day_log ]]; then
+		day_log=$day
+		rm -f "$LOG_FILE.gz"
+		gzip "$LOG_FILE"
 	fi
-	echo "$(date +%Y-%m-%d/%H:%M:%S) $@" >>${LOG_FILE}
+	echo "$(date +%Y-%m-%d/%H:%M:%S) $@" >>"$LOG_FILE"
 }
 
 
@@ -38,8 +38,8 @@ delay() { # no input // delay until seconds since epoch is a multiple of POLL_FR
 
 
 getSignal() { # no input // get signal strength
-	hcitool con | grep -q ${MAC} || sudo hcitool cc ${MAC} 2>/dev/null
-	signal=$(hcitool rssi ${MAC} 2>/dev/null)
+	hcitool con | grep -q $MAC || sudo hcitool cc $MAC 2>/dev/null
+	signal=$(hcitool rssi $MAC 2>/dev/null)
 	signal=${signal##* }
 	signal=${signal:--1000}
 }

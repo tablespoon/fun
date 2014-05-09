@@ -6,7 +6,6 @@ import signal
 from time import sleep
 from datetime import datetime
 import os
-os.system('cls' if os.name=='nt' else 'clear')
 
 
 
@@ -79,6 +78,10 @@ PC = "\033[3" + colors[PUNCT_COLOR] + ";4" + colors[PUNCT_COLOR] + "m"
 NC = "\033[0m"
 
 
+def clear():
+	os.system('cls' if os.name=='nt' else 'printf "\Ec"')
+
+
 def exit(signal, frame):
 	print "\033[5B" + "\033[?25h", # move cursor below clock and make it reappear
         sys.exit(0)
@@ -98,14 +101,28 @@ def initializeStrings():
 		strings[name] = string
 
 
+import fcntl, termios, struct
+def terminalSize():
+	h, w, hp, wp = struct.unpack('HHHH',
+		fcntl.ioctl(0, termios.TIOCGWINSZ,
+		struct.pack('HHHH', 0, 0, 0, 0)))
+	return w, h
+
+
 def drawClock():
+	terminalSize_log = "0"
 	while True:
+
+		terminalSize_cur = terminalSize()
+		if terminalSize_cur != terminalSize_log:
+			terminalSize_log = terminalSize_cur
+			clear()
 
 		print "\033[0;0H" + "\033[?25l" # move cursor to 0,0 and hide it
 
 		string = datetime.now().strftime("%I:%M:%S")
 		for i in list(string):
-			print " " * PAD_WIDTH,
+			print " " * PAD_WIDTH, 
 			sys.stdout.write(strings[i])
 		sys.stdout.flush()
 
