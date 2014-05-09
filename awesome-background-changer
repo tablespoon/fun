@@ -1,0 +1,27 @@
+#!/bin/bash
+
+WALLPAPER_DIR=$HOME/Pictures/wallpapers
+SCRIPT_NAME=$(basename $0)
+
+
+# Ensure only THIS instance of the script is running
+for pid in $(pidof -xo $$ $SCRIPT_NAME 2>/dev/null); do
+	other_pids+=" $(pstree -Apl $pid | sed -r 's/[^)]*\(//g; s/\)/ /g' | xargs echo)"
+done
+[[ $other_pids ]] && kill $other_pids @>/dev/null
+
+
+cd $WALLPAPER_DIR
+# Main loop
+while sleep ${delay:-0}; do
+	wallpapers=( $(ls | sed 's/ /\\ /g') )
+	while [[ $choice == $last ]]; do
+		index=$(( RANDOM % ${#wallpapers[@]} ))
+		choice=${wallpapers[$index]}
+	done
+	last=$choice
+	gconftool-2 --type string --set /desktop/gnome/background/picture_filename $WALLPAPER_DIR/$choice
+	gconftool-2 --type string --set /desktop/gnome/background/picture_options zoom
+	gconftool-2 --type bool --set /desktop/gnome/background/draw_background true
+	delay=$(( 3600 - $(date '+60*%M+%S' | bc) ))
+done
