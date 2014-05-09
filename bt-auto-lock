@@ -1,0 +1,83 @@
+#!/bin/bash
+
+
+. ~/lib/bluetooth-phone
+
+
+SIGNAL_THRESHOLD=0	# received signal strength indication below which the display will blank/lock
+POLL_FREQUENCY=5	# attempt to poll this frequently (in seconds)
+FAIL_RETRIES=4		# lock screen on this many failures
+SCRIPT_NAME=$(basename $0)
+LOG_FILE="$HOME/.${SCRIPT_NAME}.log"
+
+
+# Ensure only THIS instance of the script is running
+for pid in $(pidof -xo $$ ${SCRIPT_NAME} 2>/dev/null); do
+	OTHER_PIDS+=" $(pstree -Apl ${pid} | sed -r 's/[^)]*\(//g; s/\)/ /g' | xargs echo)"
+done
+[[ ${OTHER_PIDS} ]] && kill ${OTHER_PIDS} &>/dev/null
+
+
+log() { # input is a string // log input, rotating log daily
+	[[ ! -e "${LOG_FILE}" ]] && >${LOG_FILE}
+	day=$(date +%A)
+	if [[ ${day} != ${day_log} ]]; then
+		day_log=${day}
+		rm -f ${LOG_FILE}.gz
+		gzip ${LOG_FILE}
+	fi
+	echo "$(date +%Y-%m-%d/%H:%M:%S) $@" >>${LOG_FILE}
+}
+
+
+delay() { # no input // delay until seconds since epoch is a multiple of POLL_FREQUENCY
+	local seconds=$(date +%s)
+	local delay=$(( POLL_FREQUENCY - (seconds % POLL_FREQUENCY) ))
+	sleep $delay
+}
+
+
+getSignal() { # no input // get signal strength
+	hcitool con | grep -q ${MAC} || sudo hcitool cc ${MAC} 2>/dev/null
+	signal=$(hcitool rssi ${MAC} 2>/dev/null)
+	signal=${signal##* }
+	signal=${signal:--1000}
+}
+
+
+lock() { # no input // lock the screen
+	gnome-screensaver-command --activate
+}
+
+
+unlock() { # no input // unlock the screen
+	gnome-screensaver-command --deactivate
+	xset dpms force on
+	xset s reset
+}
+
+
+# Main loop
+while delay; do
+
+	getSignal
+
+	action=wait
+	if [[ $signal -lt $SIGNAL_THRESHOLD ]]; then
+		((counter++))
+		if [[ $counter -eq $FAIL_RETRIES ]]; then
+			action=lock
+		fi
+	else
+		if [[ $counter -ge $FAIL_RETRIES ]]; then
+			action=unlock
+		fi
+		counter=0
+	fi
+
+	log "action=$action signal=$signal counter=$counter"
+
+	case $action in
+		lock|unlock) $action;;
+	esac
+done
