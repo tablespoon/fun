@@ -3,6 +3,7 @@ tablespoon-fun
 
 Fun scripts from tablespoon
 
+* `auto-blockip` - squashes breakin attempts automatically
 * `awesome-background-changer` - randomly select a new wallpaper every hour
 * `bt-auto-lock` - lock/unlock machine based on phone proximity
 * `cli-clock` - make a clock with ANSI art
