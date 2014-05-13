@@ -10,7 +10,7 @@ log_file=$2
 
 
 if [[ ! -e "$log_file" || ! $minutes_to_look_back =~ ^[0-9]+$ ]]; then
-	echo "Usage: $0 <minutes> <log_file>"
+	echo "Usage: $0 <minutes> <log_file>" 1>&2
 	exit 1
 fi
 
