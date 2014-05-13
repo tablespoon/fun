@@ -5,8 +5,14 @@
 # By Todd Stein - May 12, 2014
 
 
-minutes_to_look_back=${1:-5}
-log_file=${2:-/var/log/messages}
+minutes_to_look_back=$1
+log_file=$2
+
+
+if [[ ! -e "$log_file" || ! $minutes_to_look_back =~ ^[0-9]+$ ]]; then
+	echo "Usage: $0 <minutes> <log_file>"
+	exit 1
+fi
 
 
 curr_month_num=$(date '+%m')
