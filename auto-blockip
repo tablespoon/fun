@@ -3,6 +3,7 @@
 # by Todd Stein
 # Monday, May 05 2014
 # Automatically blocks nasty IP addresses
+# Currently in testing; claws are retracted for now
 
 
 # PATH definition is required for successful cron invocation
@@ -11,10 +12,14 @@ PATH=$HOME/bin:/usr/local/install/xcat/bin:/usr/local/bin:/usr/bin:/sbin:/bin:$P
 
 MAX_ALLOWED_FAILURES=15		# more than this many failed logins = ban
 LOOK_BACK=10			# number of minutes to search back through /var/log/secure for auth failures
-EMAIL_ADDRESS=			# email will be sent here
+EMAIL_ADDRESS=tbs@usc.edu	# email will be sent here
 COUNTRY_FILE=/tmp/$(basename $0)_country_codes		# used for country name lookups
+LOG_FILE=/tmp/$(basename $0)_block_log			# log ip blocks here -- existing entries won't be blocked again
 WHITELIST="68.181|128.125|10.125|10.126|192.168"	# pipe-delimited list of whitelisted ip address prefixes
 
+
+# initialize $LOG_FILE if necessary
+[ -f "$LOG_FILE" ] || >"$LOG_FILE"
 
 # download country database if necessary
 [ -f "$COUNTRY_FILE" ] || curl -s http://www.geonames.org/countries/ >"$COUNTRY_FILE"
@@ -54,12 +59,12 @@ getWhoisAndCountry() { # input is an ip address
 	whois=$(whois $host)
 
 	# try to determine country code
-	local country_code=$(printf "%s\n" "$whois" | egrep -im1 '^country(-code)?:')
+	local country_code=$(printf "%s\n" "$whois" | egrep -im1 'country(-code)?:')
 	if [[ -z $country_code ]]; then # if whois didn't return real info for $host, try querying the network handle instead
 		local handle=$(printf "%s\n" "$whois" | grep -v '^#' | egrep -om1 '\(.+\)' | egrep -o '[^()]+')
 		sleep 1 # be respectful of the whois server
 		whois=$(whois $handle)
-		country_code=$(printf "%s\n" "$whois" | egrep -im1 '^country(-code)?:')
+		country_code=$(printf "%s\n" "$whois" | egrep -im1 'country(-code)?:')
 	fi
 
 	# extract the actuall country code from the line. the final egrep is required sometimes, presumably because of hidden characters.
@@ -72,7 +77,7 @@ getWhoisAndCountry() { # input is an ip address
 
 
 # generate list of possible attacks - ignore hosts from .usc.edu domain
-attackers=$(last_n_minutes ${LOOK_BACK} /var/log/secure | grep 'authentication failure' | egrep -o 'rhost=[^ ]+' | sort | uniq -c | sort -nr | awk -F'[= ]+' "\$2 > $MAX_ALLOWED_FAILURES { print \$NF }")
+attackers=$(last_n_minutes ${LOOK_BACK} /var/log/secure | grep 'authentication failure' | egrep -o 'rhost=[^ ]+' | egrep -v '\.usc\.edu$' | sort | uniq -c | sort -nr | awk -F'[= ]+' "\$2 > $MAX_ALLOWED_FAILURES { print \$NF }")
 
 
 for rhost in $attackers; do
@@ -99,10 +104,11 @@ for rhost in $attackers; do
 
 To unblock this IP, run 'unblockip $ip' as root on hpc-admin."
 
-	iptables -t filter -L INPUT -n | fgrep -q " $ip "
+	iptables -t filter -L INPUT -n | fgrep -q " $ip " || grep -q " ${ip//./\.}$" "$LOG_FILE"
 	if [[ $? != 0 ]]; then
+		#blockIP $ip
+		printf "%s\t%s\n" "$(date '+%b %d %H:%M:%S')" "$ip" >>"$LOG_FILE"
 		printf "%s\n\n\n%s\n\n\n%s" "$heading" "$whois" "$log" | mail -s "$subject" "$EMAIL_ADDRESS"
-		blockIP $ip
 	fi
 	sleep 1 # be respectful of the whois server
 done
