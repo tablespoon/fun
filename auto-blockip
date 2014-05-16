@@ -3,7 +3,6 @@
 # by Todd Stein
 # Monday, May 05 2014
 # Automatically blocks nasty IP addresses
-# Currently in testing; claws are retracted for now
 
 
 # PATH definition is required for successful cron invocation
