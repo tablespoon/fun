@@ -12,7 +12,7 @@ PATH=$HOME/bin:/usr/local/install/xcat/bin:/usr/local/bin:/usr/bin:/sbin:/bin:$P
 
 MAX_ALLOWED_FAILURES=15		# more than this many failed logins = ban
 LOOK_BACK=10			# number of minutes to search back through /var/log/secure for auth failures
-EMAIL_ADDRESS=tbs@usc.edu	# email will be sent here
+EMAIL_ADDRESS=			# email will be sent here
 COUNTRY_FILE=/tmp/$(basename $0)_country_codes		# used for country name lookups
 WHITELIST="68.181|128.125|10.125|10.126|192.168"	# pipe-delimited list of whitelisted ip address prefixes
 
@@ -73,7 +73,7 @@ getWhoisAndCountry() { # input is an ip address
 
 
 # generate list of possible attacks - ignore hosts from .usc.edu domain
-attackers=$(last_n_minutes ${LOOK_BACK} /var/log/secure | grep 'authentication failure' | egrep -o 'rhost=[^ ]+' | egrep -v '\.usc\.edu$' | sort | uniq -c | sort -nr | awk -F'[= ]+' "\$2 > $MAX_ALLOWED_FAILURES { print \$NF }")
+attackers=$(last_n_minutes ${LOOK_BACK} /var/log/secure | grep 'authentication failure' | egrep -o 'rhost=[^ ]+' | sort | uniq -c | sort -nr | awk -F'[= ]+' "\$2 > $MAX_ALLOWED_FAILURES { print \$NF }")
 
 
 for rhost in $attackers; do
