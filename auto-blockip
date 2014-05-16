@@ -7,54 +7,68 @@
 
 
 # PATH definition is required for successful cron invocation
-PATH=$HOME/bin:/usr/local/bin:/usr/bin:/sbin:/bin:$PATH
+PATH=$HOME/bin:/usr/local/install/xcat/bin:/usr/local/bin:/usr/bin:/sbin:/bin:$PATH
 
 
 MAX_ALLOWED_FAILURES=15		# more than this many failed logins = ban
 LOOK_BACK=10			# number of minutes to search back through /var/log/secure for auth failures
 EMAIL_ADDRESS=tbs@usc.edu	# email will be sent here
-COUNTRY_FILE=/tmp/country_codes # used for country name lookups
-WHITELIST="68.181|128.125|10.125|10.126|192.168"	# pipe separated list of whitelisted ip address prefixes
+COUNTRY_FILE=/tmp/$(basename $0)_country_codes		# used for country name lookups
+WHITELIST="68.181|128.125|10.125|10.126|192.168"	# pipe-delimited list of whitelisted ip address prefixes
 
 
 # download country database if necessary
 [ -f "$COUNTRY_FILE" ] || curl -s http://www.geonames.org/countries/ >"$COUNTRY_FILE"
-
-# this line is only to facilitate testing
-[ -e /tmp/auto-blockip ] || >/tmp/auto-blockip
 
 
 blockIP() { # input is a string
 	local ip=$1
 	local SEARCH_STRING="^DROP +all .+ ${ip//./\.} +0.0.0.0/0 *$"
 	local COMMAND="
-		if ! iptables -t filter -L INPUT -n | egrep -q \"$SEARCH_STRING\"; then
+		if ! iptables -L INPUT -n | egrep -q \"$SEARCH_STRING\"; then
 			iptables -I INPUT 1 -s $ip -j DROP
 		fi
 	"
 
+	# block it!
 	eval "$COMMAND"
-	psh headnodes "$COMMAND"
+
+	# if we're on an xcat-managed cluster, block $ip on all heanodes, too
+	which psh &>/dev/null && psh headnodes "$COMMAND"
 }
 
 
-ensureIP() { # input is a string
+getIPandFQDN() { # input is a string
 	local host=$1
 	if [[ $host =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-		printf "%s\n" "$host"
+		ip=$host
 	else
-		host $host | grep 'has address' | egrep -om1 '([0-9]{1,3}\.){3}[0-9]{1,3}$'
+		fqdn=$host
+		ip=$(host $host | grep 'has address' | egrep -om1 '([0-9]{1,3}\.){3}[0-9]{1,3}$')
 	fi
 }
 
 
-deriveCountry() { # input is a string -- the output of whois
+getWhoisAndCountry() { # input is an ip address
+	local host=$1
 
-	local whois_output=$1
-	local country_code=$(printf "%s\n" "$1" | egrep -im1 "(^country:|country-code:)" | awk -F'[ :]' '{print toupper($NF)}' | egrep -o "[A-Z]+")
-	local country_name=$(grep "name=\"$country_code\"" "$COUNTRY_FILE" | egrep -o 'href="[^"]+">([^<]+)' | sed -r 's/.+>//')
+	whois=$(whois $host)
 
-	printf "%s\n" "${country_name:-country unknown}"
+	# try to determine country code
+	local country_code=$(printf "%s\n" "$whois" | egrep -im1 '^country(-code)?:')
+	if [[ -z $country_code ]]; then # if whois didn't return real info for $host, try querying the network handle instead
+		local handle=$(printf "%s\n" "$whois" | grep -v '^#' | egrep -om1 '\(.+\)' | egrep -o '[^()]+')
+		sleep 1 # be respectful of the whois server
+		whois=$(whois $handle)
+		country_code=$(printf "%s\n" "$whois" | egrep -im1 '^country(-code)?:')
+	fi
+
+	# extract the actuall country code from the line. the final egrep is required sometimes, presumably because of hidden characters.
+	country_code=$(printf "%s\n" "$country_code" | awk -F'[ :]+' '{print toupper($NF)}' | egrep -o "[A-Z]+")
+
+	# translate the code to an actual name.
+	country=$(grep "name=\"$country_code\"" "$COUNTRY_FILE" | egrep -o 'href="[^"]+">([^<]+)' | sed -r 's/.+>//')
+	country=${country:-country unknown}
 }
 
 
@@ -64,25 +78,30 @@ attackers=$(last_n_minutes ${LOOK_BACK} /var/log/secure | grep 'authentication f
 
 for rhost in $attackers; do
 
-	# if resolve hostnames to ips if necessary
-	ip=$(ensureIP $rhost)
+	unset ip fqdn whois country
 
-	# ensure ip is not in USC address space
-	[[ $ip =~ ^(68\.181\.|128\.125\.) ]] && continue
+	# set $ip and $fqdn
+	getIPandFQDN $rhost
+
+	# ensure $ip is not in USC address space
+	[[ $WHITELIST && $ip =~ ^(${WHITELIST//./\.}) ]] && continue
 
 	# second check to ensure that this is not one of our machines!
 	egrep -q "\b(${rhost//./\.}|${ip//./\.})\b" /etc/hosts && continue
 
-	log=$(egrep "( |=)${rhost//./\.}( |$)" /var/log/secure) # full secure history of rhost
-	whois=$(whois $ip)
-	country=$(deriveCountry "$whois")
+	# grab full secure history of $rhost
+	log=$(egrep "( |=)${rhost//./\.}( |$)" /var/log/secure)
 
-	subject="Squashed breakin attempt from $rhost ($country)"
-	heading="Packets from $ip are now being dropped by all headnodes. The following lines provide information about the remote host, as well as a recent history of communications from it. The last 15 minutes of the log were used to determine that the activity was malevolent. To unblock this IP, run 'unblock $ip' as root on hpc-admin."
+	# set $whois and $country
+	getWhoisAndCountry $ip
 
-	iptables -t filter -L INPUT -n | fgrep -q " $rhost " #|| fgrep -q " $rhost" /tmp/auto-blockip
+	subject="Squashed breakin attempt from $ip ($country)"
+	heading="Packets from $ip${fqdn:+ ($fqdn)} are now being dropped by all headnodes. The following lines provide information about the remote host, as well as a recent history of communications from it. The last 15 minutes of the log were used to determine that the activity was malevolent.
+
+To unblock this IP, run 'unblockip $ip' as root on hpc-admin."
+
+	iptables -t filter -L INPUT -n | fgrep -q " $ip "
 	if [[ $? != 0 ]]; then
-#		echo "$(date) blockip $rhost" >>/tmp/auto-blockip
 		printf "%s\n\n\n%s\n\n\n%s" "$heading" "$whois" "$log" | mail -s "$subject" "$EMAIL_ADDRESS"
 		blockIP $ip
 	fi
