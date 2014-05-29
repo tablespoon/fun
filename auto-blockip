@@ -10,9 +10,10 @@
 PATH=$HOME/bin:/usr/local/install/xcat/bin:/usr/local/bin:/usr/bin:/sbin:/bin:$PATH
 
 
-MAX_ALLOWED_FAILURES=15		# more than this many failed logins = ban
-LOOK_BACK=10			# number of minutes to search back through /var/log/secure for auth failures
-EMAIL_ADDRESS=tbs@usc.edu	# email will be sent here
+MAX_ALLOWED_FAILURES=20		# more than this many failed logins = ban
+LOOK_BACK=5			# number of minutes to search back through /var/log/secure for auth failures
+MOLE_LIMIT=5			# on the Nth ip from the same /24, the whole subnet will be blocked instead; whack-a-mole bad.
+EMAIL_ADDRESS=hpcc@usc.edu	# email will be sent here
 COUNTRY_FILE=/tmp/$(basename $0)_country_codes		# used for country name lookups
 LOG_FILE=/tmp/$(basename $0)_block_log			# log ip blocks here -- existing entries won't be blocked again
 WHITELIST="68.181|128.125|10.125|10.126|192.168"	# pipe-delimited list of whitelisted ip address prefixes
@@ -27,25 +28,49 @@ WHITELIST="68.181|128.125|10.125|10.126|192.168"	# pipe-delimited list of whitel
 
 blockIP() { # input is a string
 	local ip=$1
-	local SEARCH_STRING="^DROP +all .+ ${ip//./\.} +0.0.0.0/0 *$"
-	local COMMAND="
-		if ! iptables -L INPUT -n | egrep -q \"$SEARCH_STRING\"; then
-			iptables -I INPUT 1 -s $ip -j DROP
-		fi
-	"
+
+	# this will be used to count how many attacks from the same /24 have occurred
+	local escaped_ip="${ip//./\.}"
+	local same_subnet_match_string="^DROP +all .+ ${escaped_ip%.*}.[0-9]{1,3} +0\.0\.0\.0/0 *$"
+
+	# if we've seen fewer than $MOLE_LIMIT attackers from this /24
+	if [[ $(iptables -L INPUT -n | egrep -c "$same_subnet_match_string") -lt $MOLE_LIMIT ]]; then
+		# we only want to block the IP
+		local ip_search_string="^DROP +all .+ ${escaped_ip} +0\.0\.0\.0/0 *$"
+		local command="
+			if ! iptables -L INPUT -n | egrep -q \"$ip_search_string\"; then
+				iptables -I INPUT 1 -s $ip -j DROP
+			fi
+		"
+	else
+		# we want to block the whole subnet
+		subnet="${ip%.*}.0/24"
+		local subnet_search_string="^DROP +all .+ ${subnet//./\.} +0\.0\.0\.0/0 *$"
+		local command="
+			if ! iptables -L INPUT -n | egrep -q \"$subnet_search_string\"; then
+				iptables -I INPUT 1 -s $subnet -j DROP
+			fi
+		"
+	fi
 
 	# block it!
-	eval "$COMMAND"
+	eval "$command"
 
 	# if we're on an xcat-managed cluster, block $ip on all heanodes, too
-	which psh &>/dev/null && psh headnodes "$COMMAND"
+	which psh &>/dev/null && psh headnodes "$command"
+
+	# log that we blocked
+	printf "%s\t%s\n" "$(date '+%b %d %H:%M:%S')" "${subnet:-$ip}" >>"$LOG_FILE"
 }
 
 
 getIPandFQDN() { # input is a string
 	local host=$1
+
+	# if $host is already an IP address
 	if [[ $host =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
 		ip=$host
+		fqdn=$(host $host | awk '/domain name pointer/ {print $NF; exit}')
 	else
 		fqdn=$host
 		ip=$(host $host | grep 'has address' | egrep -om1 '([0-9]{1,3}\.){3}[0-9]{1,3}$')
@@ -56,6 +81,7 @@ getIPandFQDN() { # input is a string
 getWhoisAndCountry() { # input is an ip address
 	local host=$1
 
+	sleep 1 # be respectful of the whois server
 	whois=$(whois $host)
 
 	# try to determine country code
@@ -63,21 +89,46 @@ getWhoisAndCountry() { # input is an ip address
 	if [[ -z $country_code ]]; then # if whois didn't return real info for $host, try querying the network handle instead
 		local handle=$(printf "%s\n" "$whois" | grep -v '^#' | egrep -om1 '\(.+\)' | egrep -o '[^()]+')
 		sleep 1 # be respectful of the whois server
-		whois=$(whois $handle)
-		country_code=$(printf "%s\n" "$whois" | egrep -im1 'country(-code)?:')
+		local whois_2nd=$(whois $handle)
+		country_code=$(printf "%s\n" "$whois_2nd" | egrep -im1 'country(-code)?:')
+		[[ -n $country_code ]] && whois="$whois_2nd"
 	fi
+
+	# remove any formatting that could cause the email contents to be sent as an attachment instead of inline
+	# it seems to be caused by a carriage return or vertical tab or something else in [:space:] but not [:blank:]
+	whois="$(printf "%s\n" "$whois" | sed -r 's/[^[:blank:][:graph:]]//g')"
 
 	# extract the actuall country code from the line. the final egrep is required sometimes, presumably because of hidden characters.
 	country_code=$(printf "%s\n" "$country_code" | awk -F'[ :]+' '{print toupper($NF)}' | egrep -o "[A-Z]+")
 
 	# translate the code to an actual name.
 	country=$(grep "name=\"$country_code\"" "$COUNTRY_FILE" | egrep -o 'href="[^"]+">([^<]+)' | sed -r 's/.+>//')
-	country=${country:-country unknown}
+}
+
+
+sendMail() { # no input
+
+	# if we blocked a subnet
+	if [[ $subnet ]]; then
+		subject="Squashed breakin attempts from $subnet${country:+ ($country)}"
+		heading="An attack was detected from $ip${fqdn:+ ($fqdn)}, and all packets from $subnet are now being dropped by all headnodes as a result. There have been at least $MOLE_LIMIT breach attempts from this /24, so a larger mallet has been employed. The following lines provide information about the remote host, as well as a recent history of communications from it. The last ${LOOK_BACK} minutes of the log were used to determine that the activity was malevolent.
+
+To unblock this subnet, run 'unblockip $subnet' as root on hpc-admin."
+	else
+		subject="Squashed breakin attempt from $ip${country:+ ($country)}"
+		heading="Packets from $ip${fqdn:+ ($fqdn)} are now being dropped by all headnodes. The following lines provide information about the remote host, as well as a recent history of communications from it. The last ${LOOK_BACK} minutes of the log were used to determine that the activity was malevolent.
+
+To unblock this IP, run 'unblockip $ip' as root on hpc-admin."
+	fi
+
+	body="$(printf "%s\n\n\n%s\n\n\n%s" "$heading" "$whois" "$log")"
+
+	mail -s "$subject" "$EMAIL_ADDRESS" <<<"$body"
 }
 
 
 # generate list of possible attacks - ignore hosts from .usc.edu domain
-attackers=$(last_n_minutes ${LOOK_BACK} /var/log/secure | grep 'authentication failure' | egrep -o 'rhost=[^ ]+' | egrep -v '\.usc\.edu$' | sort | uniq -c | sort -nr | awk -F'[= ]+' "\$2 > $MAX_ALLOWED_FAILURES { print \$NF }")
+attackers=$(last_n_minutes $LOOK_BACK /var/log/messages | egrep 'sshd\[[0-9]+\]:.*(Failed password|Invalid user)' | egrep -o '\bfrom ([0-9]{1,3}\.){3}[0-9]{1,3}\b' | sort | uniq -c | sort -nr | awk -v m=$MAX_ALLOWED_FAILURES -F '[= ]+' '{if ($2>m) {print $NF} else {exit}}')
 
 
 for rhost in $attackers; do
@@ -87,28 +138,24 @@ for rhost in $attackers; do
 	# set $ip and $fqdn
 	getIPandFQDN $rhost
 
-	# ensure $ip is not in USC address space
-	[[ $WHITELIST && $ip =~ ^(${WHITELIST//./\.}) ]] && continue
+	# ensure $ip is not in USC address space and/or $fqdn doesn't end in .usc.edu. Ensure it's not a cluster machine.
+	egrep -q "\b(${rhost//./\.}|${ip//./\.})\b" /etc/hosts || \
+	[[ $fqdn =~ \.usc\.edu$ ]] || \
+	[[ $WHITELIST && $ip =~ ^(${WHITELIST//./\.}) ]]
+	[[ $? == 0 ]] && continue
 
-	# second check to ensure that this is not one of our machines!
-	egrep -q "\b(${rhost//./\.}|${ip//./\.})\b" /etc/hosts && continue
-
-	# grab full secure history of $rhost
-	log=$(egrep "( |=)${rhost//./\.}( |$)" /var/log/secure)
-
-	# set $whois and $country
-	getWhoisAndCountry $ip
-
-	subject="Squashed breakin attempt from $ip ($country)"
-	heading="Packets from $ip${fqdn:+ ($fqdn)} are now being dropped by all headnodes. The following lines provide information about the remote host, as well as a recent history of communications from it. The last 15 minutes of the log were used to determine that the activity was malevolent.
-
-To unblock this IP, run 'unblockip $ip' as root on hpc-admin."
-
-	iptables -t filter -L INPUT -n | fgrep -q " $ip " || grep -q " ${ip//./\.}$" "$LOG_FILE"
+	# ensure the attacker is not already blocked, preventing multiple blocks
+	escaped_ip="${ip//./\.}"
+	iptables -t filter -L INPUT -n | egrep -q " ($escaped_ip|${escaped_ip%.*}.0/24) "
 	if [[ $? != 0 ]]; then
-		#blockIP $ip
-		printf "%s\t%s\n" "$(date '+%b %d %H:%M:%S')" "$ip" >>"$LOG_FILE"
-		printf "%s\n\n\n%s\n\n\n%s" "$heading" "$whois" "$log" | mail -s "$subject" "$EMAIL_ADDRESS"
+		blockIP $ip
+
+		# grab full secure history of $rhost
+		log=$(egrep "\b${rhost//./\.}\b" /var/log/messages)
+
+		# set $whois and $country
+		getWhoisAndCountry $ip
+
+		sendMail
 	fi
-	sleep 1 # be respectful of the whois server
 done
