@@ -42,7 +42,6 @@ prev_search_replace="s/^$prev_month_name $time_string/$prev_month_year $prev_mon
 # sed - reformats standard timestamp to 'YYYY MM DD HH MM SS' so awk can translate to seconds since epoch
 # awk - when the timestamp becomes older than our target, print it (translated to seconds since epoch) + exit
 # date - translate timestamp (seconds since epoch) back to standard linux log format
-# sed - strip leading zero from number representing day of month
 # sed - print log_file, skipping everything up to and including timestamp
 # STDERR redirection suppresses broken pipe message which can occur if this script is piped to a command like head
 
@@ -50,6 +49,5 @@ target=$(echo "$(date +%s)-60*$minutes_to_look_back" | bc)
 tac "$log_file" \
 	| sed -r "$curr_search_replace; $prev_search_replace" \
 	| awk -v t=$target '{if (mktime($0) < t){print mktime($0); exit}}' \
-	| xargs -rI{} date -d '@{}' '+%b %d %H:%M:%S' \
-	| sed -r 's/^([[:alpha:]]+ )0([0-9]\b)/\1 \2/' \
+	| xargs -rI{} date -d '@{}' '+%b %e %H:%M:%S' \
 	| xargs -rI{} sed -r '1,/{}/d; /{}/d' "$log_file" 2>/dev/null
