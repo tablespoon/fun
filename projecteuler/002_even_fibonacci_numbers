@@ -1,0 +1,15 @@
+#!/bin/bash
+
+limit=4000000
+set=( 1 1 )
+
+# find fibonacci numbers below limit and add up even numbers found along the way
+# to stubbornly avoid using % because Paul thought of it first, I'm determining a number's
+# even-ness by checking to see if half of the number is itself a whole number
+counter=1
+while sum=$(( ${set[${counter}]} + ${set[$((counter-1))]} )) && [[ ${sum} -lt ${limit} ]]; do
+	set[$((++counter))]=${sum}
+	egrep -q "\.0+$" <<< $(bc -l <<< ${sum}/2) && ((total+=${sum}))
+done
+
+echo ${total}

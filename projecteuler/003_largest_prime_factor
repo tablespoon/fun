@@ -1,0 +1,37 @@
+#!/bin/bash
+
+number=${1:-600851475143}
+squareRoot=$(bc <<< "sqrt($number)")
+primeString="(  PRIME  )"
+compositeString="(composite)"
+
+primeCheck() {
+	sqrt=$(bc <<< "sqrt($1)")
+	for (( i=2; i<=sqrt; i++ )); do
+		if [[ $(( $1 % i )) -eq 0 ]]; then
+			printf " $compositeString"
+			return 1 
+		fi
+	done
+	largestPrime=$1
+	printf " $primeString"
+	return 0
+}
+
+# find factors of number, and determine if their partner is prime; this will give us the highest prime factor
+echo -e "\nlisting factors of $number"
+for (( incrementer=2; incrementer<=squareRoot; incrementer++ )); do
+	if [[ $(( number % incrementer )) -eq 0 ]]; then
+		printf "\n$incrementer"
+                primeCheck $incrementer
+		candidate=$(( number / incrementer ))
+		printf " * $candidate"
+		primeCheck $candidate
+	fi
+done
+
+if [[ -n $largestPrime ]]; then
+	echo -e "\n\n$largestPrime is the largest prime factor of $number\n"
+else
+	echo -e "\n\n$number has no prime factors\n"
+fi

@@ -1,0 +1,12 @@
+[toddstei@orion ~]$ for ((i=0; ${i}<$(wc -c <<<${asdf}); i++)); do fdsa=${asdf:${i}:1}${fdsa}; done; echo ${fdsa}
+fdsa
+[toddstei@orion ~]$ asdf=qwerty
+[toddstei@orion ~]$ for ((i=0; ${i}<$(wc -c <<<${asdf}); i++)); do fdsa=${asdf:${i}:1}${fdsa}; done; echo ${fdsa}
+ytrewqfdsa
+[toddstei@orion ~]$ unset fdsa; for ((i=0; ${i}<$(wc -c <<<${asdf}); i++)); do fdsa=${asdf:${i}:1}${fdsa}; done; echo ${fdsa}
+ytrewq
+[toddstei@orion ~]$ bc -l <<< 998*998
+996004
+[toddstei@orion ~]$ bc -l <<< 997*999
+996003
+

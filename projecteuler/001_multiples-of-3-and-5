@@ -1,0 +1,18 @@
+#!/bin/bash
+
+multiples="3 5"
+maxVal="1000"
+
+for number in $(
+	for i in ${multiples}; do
+		curVal=${i}
+		while [[ ${curVal} -lt ${maxVal} ]]; do
+			echo "${curVal}"
+			((curVal+=${i}))
+		done
+	done | sort -nu
+); do
+	((total+=${number}))
+done
+
+echo ${total}
