@@ -13,7 +13,8 @@ palindromeCheck() {
 		if [[ ${string:$i:1} != ${string:0-$((i+1)):1} ]]; then
 			return 1
 		fi
-	done && return 0
+	done
+	return 0
 }
 
 for a in {999..100}; do
