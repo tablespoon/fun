@@ -24,6 +24,7 @@ for a in {999..100}; do
 			if [[ $product -gt $largest_palindrome ]]; then
 				largest_palindrome=$product
 				multiples="$a * $b"
+				break
 			fi
 		fi
 	done
