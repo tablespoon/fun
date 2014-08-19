@@ -1,12 +1,31 @@
-[toddstei@orion ~]$ for ((i=0; ${i}<$(wc -c <<<${asdf}); i++)); do fdsa=${asdf:${i}:1}${fdsa}; done; echo ${fdsa}
-fdsa
-[toddstei@orion ~]$ asdf=qwerty
-[toddstei@orion ~]$ for ((i=0; ${i}<$(wc -c <<<${asdf}); i++)); do fdsa=${asdf:${i}:1}${fdsa}; done; echo ${fdsa}
-ytrewqfdsa
-[toddstei@orion ~]$ unset fdsa; for ((i=0; ${i}<$(wc -c <<<${asdf}); i++)); do fdsa=${asdf:${i}:1}${fdsa}; done; echo ${fdsa}
-ytrewq
-[toddstei@orion ~]$ bc -l <<< 998*998
-996004
-[toddstei@orion ~]$ bc -l <<< 997*999
-996003
+#!/bin/bash
 
+# A palindromic number reads the same both ways. The largest palindrome made from the product of two 2-digit numbers is 9009 = 91 × 99.
+# Find the largest palindrome made from the product of two 3-digit numbers.
+
+palindromeCheck() {
+	local string=$1
+	local length=${#string}
+	local half_length=$((length/2))
+	local i
+	for (( i=0; i<half_length; i++ )); do
+		# if the first char doesn't equal the last, the second char doesn't equal the penultimate, etc...
+		if [[ ${string:$i:1} != ${string:0-$((i+1)):1} ]]; then
+			return 1
+		fi
+	done && return 0
+}
+
+for a in {999..100}; do
+	for b in {999..100}; do
+		product=$((a*b))
+		[[ $product -le $largest_palindrome ]] && break
+		if palindromeCheck $product; then
+			if [[ $product -gt $largest_palindrome ]]; then
+				largest_palindrome=$product
+				multiples="$a * $b"
+			fi
+		fi
+	done
+done
+printf "%s\n" "$largest_palindrome ($multiples) is the largest palindrome made from the product of two 3-digit numbers."
