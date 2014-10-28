@@ -45,6 +45,26 @@ fi
 # restart dnsmasq service
 /etc/init.d/dnsmasq restart
 
+# carefully add script to /etc/rc.local if it's not already there
+if ! grep -q "$SCRIPT_NAME" /etc/rc.local; then
+	# using awk ensures that no symlinks (if any exist) are clobbered by BusyBox's sed.
+	awk -v script_name=$SCRIPT_NAME '
+		! /^exit( 0)?$/ {
+			print $0
+		}
+		/^exit( 0)?$/ {
+			print script_name "\n" $0
+			entry_added=1
+		}
+		END {
+			if (entry_added != 1) {
+				print script_name
+			}
+		}' /etc/rc.local >/tmp/rc.local.new
+	cat /tmp/rc.local.new >/etc/rc.local
+	rm -f /tmp/rc.local.new
+fi
+
 # add script to root's crontab if it's not already there
 grep -q "$SCRIPT_NAME" /etc/crontabs/root 2>/dev/null || cat >>/etc/crontabs/root <<-:EOF:
 	# Download updated ad and malware server lists every Tuesday at 3 AM
