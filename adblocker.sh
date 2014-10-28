@@ -1,7 +1,10 @@
 #!/bin/sh
 
-# /usr/local/bin/adblocker.sh
-# Periodically download lists of known ad and malware servers, and prevent traffic from being sent to them
+# adblocker.sh - by Todd Stein (toddbstein@gmail.com), Saturday, October 25, 2014
+
+# Periodically download lists of known ad and malware servers, and prevents traffic from being sent to them.
+# This is a complete rewrite of a script originally written by teffalump (https://github.com/teffalump).
+
 
 HOST_LISTS="
 	http://adaway.org/hosts.txt
@@ -12,7 +15,7 @@ HOST_LISTS="
 BLOCKLIST=/tmp/adblocker_hostlist
 BLACKLIST=/etc/adblocker_blacklist
 WHITELIST=/etc/adblocker_whitelist
-SCRIPT_NAME=/usr/local/bin/adblocker.sh
+SCRIPT_NAME=/root/bin/adblocker.sh
 
 
 # initialize block list
@@ -35,12 +38,12 @@ fi
 sed -ri 's/([^ ]+)$/\1\n::      \1/' $BLOCKLIST
 
 # add block list to dnsmasq config if it's not already there
-#if ! uci get dhcp.@dnsmasq[0].addnhosts | grep -q "$BLOCKLIST"; then
-#	uci add_list dhcp.@dnsmasq[0].addnhosts=$BLOCKLIST && uci commit
-#fi
+if ! uci get dhcp.@dnsmasq[0].addnhosts | grep -q "$BLOCKLIST"; then
+	uci add_list dhcp.@dnsmasq[0].addnhosts=$BLOCKLIST && uci commit
+fi
 
 # restart dnsmasq service
-#/etc/init.d/dnsmasq restart
+/etc/init.d/dnsmasq restart
 
 # add script to root's crontab if it's not already there
-#grep -q "$SCRIPT_NAME" /etc/crontabs/root || echo "0 3 * * 2 /bin/sh $SCRIPT_NAME" >>/etc/crontabs/root
+grep -q "$SCRIPT_NAME" /etc/crontabs/root || echo "0 3 * * 2 /bin/sh $SCRIPT_NAME" >>/etc/crontabs/root
