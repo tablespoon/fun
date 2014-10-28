@@ -25,7 +25,7 @@ SCRIPT_NAME=/root/bin/adblocker.sh
 [ -s "$BLACKLIST" ] && awk '/^[^#]/ { print "0.0.0.0",$1 }' $BLACKLIST >>$BLOCKLIST
 
 # grab host lists from the internet
-wget --timeout=30 -qO- $HOST_LISTS | sed -rn 's/^(127.0.0.1|0.0.0.0)/0.0.0.0/p' | awk '{ print $1,$2 }' | sort -uk2 >>$BLOCKLIST
+wget -qO- $HOST_LISTS | sed -rn 's/^(127.0.0.1|0.0.0.0)/0.0.0.0/p' | awk '{ print $1,$2 }' | sort -uk2 >>$BLOCKLIST
 
 # remove any whitelisted domains from the block list
 if [ -s "$WHITELIST" ]; then
