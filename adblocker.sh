@@ -46,4 +46,7 @@ fi
 /etc/init.d/dnsmasq restart
 
 # add script to root's crontab if it's not already there
-grep -q "$SCRIPT_NAME" /etc/crontabs/root || echo "0 3 * * 2 /bin/sh $SCRIPT_NAME" >>/etc/crontabs/root
+grep -q "$SCRIPT_NAME" /etc/crontabs/root || cat >>/etc/crontabs/root <<-:EOF:
+	# Download updated ad and malware server lists every Tuesday at 3 AM
+	0 3 * * 2 /bin/sh $SCRIPT_NAME
+	:EOF:
