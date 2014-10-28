@@ -17,6 +17,10 @@ BLACKLIST=/etc/adblocker_blacklist
 WHITELIST=/etc/adblocker_whitelist
 SCRIPT_NAME=/root/bin/adblocker.sh
 
+# await internet connectivity before proceeding (in case rc.local executes this script before connectivity is achieved)
+until ping -c1 -w1 google.com || ping -c1 -w1 yahoo.com; do
+	sleep 5
+done &>/dev/null
 
 # initialize block list
 >$BLOCKLIST
@@ -48,17 +52,17 @@ fi
 # carefully add script to /etc/rc.local if it's not already there
 if ! grep -q "$SCRIPT_NAME" /etc/rc.local; then
 	# using awk ensures that no symlinks (if any exist) are clobbered by BusyBox's sed.
-	awk -v script_name=$SCRIPT_NAME '
+	awk -v command="$SCRIPT_NAME" '
 		! /^exit( 0)?$/ {
 			print $0
 		}
 		/^exit( 0)?$/ {
-			print script_name "\n" $0
+			print command "\n" $0
 			entry_added=1
 		}
 		END {
 			if (entry_added != 1) {
-				print script_name
+				print command
 			}
 		}' /etc/rc.local >/tmp/rc.local.new
 	cat /tmp/rc.local.new >/etc/rc.local
