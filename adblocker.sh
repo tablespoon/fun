@@ -49,4 +49,4 @@ fi
 grep -q "$SCRIPT_NAME" /etc/crontabs/root || cat >>/etc/crontabs/root <<-:EOF:
 	# Download updated ad and malware server lists every Tuesday at 3 AM
 	0 3 * * 2 /bin/sh $SCRIPT_NAME
-	:EOF:
+:EOF:
