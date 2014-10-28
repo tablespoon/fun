@@ -3,7 +3,7 @@
 # adblocker.sh - by Todd Stein (toddbstein@gmail.com), Saturday, October 25, 2014
 
 # Periodically download lists of known ad and malware servers, and prevents traffic from being sent to them.
-# This is a complete rewrite of a script originally written by teffalump (https://github.com/teffalump).
+# This is a complete rewrite of a script originally written by teffalump (https://gist.github.com/teffalump/7227752).
 
 
 HOST_LISTS="
