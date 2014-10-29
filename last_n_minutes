@@ -45,9 +45,11 @@ prev_search_replace="s/^$prev_month_name $time_string/$prev_month_year $prev_mon
 # sed - print log_file, skipping everything up to and including timestamp
 # STDERR redirection suppresses broken pipe message which can occur if this script is piped to a command like head
 
-target=$(echo "$(date +%s)-60*$minutes_to_look_back" | bc)
-tac "$log_file" \
+proposed_target=$(echo "$(date +%s)-60*$minutes_to_look_back" | bc)
+actual_target=$(tac "$log_file" \
 	| sed -r "$curr_search_replace; $prev_search_replace" \
-	| awk -v t=$target '{if (mktime($0) < t){print mktime($0); exit}}' \
-	| xargs -rI{} date -d '@{}' '+%b %e %H:%M:%S' \
-	| xargs -rI{} sed -r '1,/^{}/d; /^{}/d' "$log_file" 2>/dev/null
+	| awk -v t=$proposed_target '{if (mktime($0) < t){print mktime($0); exit}}' \
+	| xargs -rI{} date -d '@{}' '+%b %e %H:%M:%S'
+)
+
+tac $log_file | awk "/^$actual_target/"'{ exit }; { print }' | tac
