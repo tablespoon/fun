@@ -46,7 +46,8 @@ prev_search_replace="s/^$prev_month_name $time_string/$prev_month_year $prev_mon
 # STDERR redirection suppresses broken pipe message which can occur if this script is piped to a command like head
 
 proposed_target=$(echo "$(date +%s)-60*$minutes_to_look_back" | bc)
-actual_target=$(tac "$log_file" \
+actual_target=$(
+	tac "$log_file" \
 	| sed -r "$curr_search_replace; $prev_search_replace" \
 	| awk -v t=$proposed_target '{if (mktime($0) < t){print mktime($0); exit}}' \
 	| xargs -rI{} date -d '@{}' '+%b %e %H:%M:%S'
