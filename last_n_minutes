@@ -50,4 +50,4 @@ tac "$log_file" \
 	| sed -r "$curr_search_replace; $prev_search_replace" \
 	| awk -v t=$target '{if (mktime($0) < t){print mktime($0); exit}}' \
 	| xargs -rI{} date -d '@{}' '+%b %e %H:%M:%S' \
-	| xargs -rI{} sed -r '1,/{}/d; /{}/d' "$log_file" 2>/dev/null
+	| xargs -rI{} sed -r '1,/^{}/d; /^{}/d' "$log_file" 2>/dev/null
