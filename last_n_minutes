@@ -52,4 +52,4 @@ actual_target=$(tac "$log_file" \
 	| xargs -rI{} date -d '@{}' '+%b %e %H:%M:%S'
 )
 
-tac $log_file | awk "/^$actual_target/"'{ exit }; { print }' | tac
+tac $log_file | awk "/^$actual_target/ { exit }; { print }" | tac
