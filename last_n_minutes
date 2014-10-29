@@ -37,13 +37,12 @@ prev_search_replace="s/^$prev_month_name $time_string/$prev_month_year $prev_mon
 
 ## Print all lines of log_file newer than $minutes_to_look_back minutes old
 #
-# target = current seconds since epoch - how many seconds since epoch we want to prune to
-# tac - streams log_file backwards to sed
-# sed - reformats standard timestamp to 'YYYY MM DD HH MM SS' so awk can translate to seconds since epoch
-# awk - when the timestamp becomes older than our target, print it (translated to seconds since epoch) + exit
-# date - translate timestamp (seconds since epoch) back to standard linux log format
-# sed - print log_file, skipping everything up to and including timestamp
-# STDERR redirection suppresses broken pipe message which can occur if this script is piped to a command like head
+# proposed_target = current seconds since epoch - how many seconds since epoch we want to prune to
+# actual_target = 
+#	tac - streams log_file backwards to sed
+#	| sed - reformats standard timestamp to 'YYYY MM DD HH MM SS' so awk can translate to seconds since epoch
+#	| awk - when the timestamp becomes older than our proposed target, print it (translated to seconds since epoch) + exit
+#	| date - translate timestamp (seconds since epoch) back to standard linux log format
 
 proposed_target=$(echo "$(date +%s)-60*$minutes_to_look_back" | bc)
 actual_target=$(
@@ -53,4 +52,5 @@ actual_target=$(
 	| xargs -rI{} date -d '@{}' '+%b %e %H:%M:%S'
 )
 
+# stream log backwards printing all lines until target is reached, then re-invert output
 tac $log_file | awk "/^$actual_target/ { exit }; { print }" | tac
