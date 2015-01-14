@@ -42,6 +42,7 @@ getSignal() { # no input // get signal strength
 	signal=$(hcitool rssi $MAC 2>/dev/null)
 	signal=${signal##* }
 	signal=${signal:--1000}
+	sudo hcitool dc $MAC 2>/dev/null
 }
 
 
