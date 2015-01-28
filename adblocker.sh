@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # adblocker.sh - by Todd Stein (toddbstein@gmail.com), Saturday, October 25, 2014
+# for use on routers running OpenWRT firmware
 
 # Periodically download lists of known ad and malware servers, and prevents traffic from being sent to them.
 # This is a complete rewrite of a script originally written by teffalump (https://gist.github.com/teffalump/7227752).
@@ -18,7 +19,7 @@ WHITELIST=/etc/adblocker_whitelist
 SCRIPT_NAME=/root/bin/adblocker.sh
 
 # await internet connectivity before proceeding (in case rc.local executes this script before connectivity is achieved)
-until ping -c1 -w1 google.com || ping -c1 -w1 yahoo.com; do
+until ping -c1 -w3 google.com || ping -c1 -w3 yahoo.com; do
 	sleep 5
 done &>/dev/null
 
@@ -51,7 +52,7 @@ fi
 
 # carefully add script to /etc/rc.local if it's not already there
 if ! grep -q "$SCRIPT_NAME" /etc/rc.local; then
-	# using awk ensures that no symlinks (if any exist) are clobbered by BusyBox's sed.
+	# using awk and cat ensures that no symlinks (if any exist) are clobbered by BusyBox's feature-poor sed.
 	awk -v command="$SCRIPT_NAME" '
 		! /^exit( 0)?$/ {
 			print $0
