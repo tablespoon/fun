@@ -17,7 +17,11 @@ HOST_LISTS="
 BLOCKLIST=/tmp/adblocker_hostlist
 BLACKLIST=/etc/adblocker_blacklist
 WHITELIST=/etc/adblocker_whitelist
-SCRIPT_NAME=/root/bin/adblocker.sh
+
+# get script's absolute path
+cd ${0%/*}
+SCRIPT_NAME=$PWD/${0##*/}
+cd $OLDPWD
 
 # await internet connectivity before proceeding (in case rc.local executes this script before connectivity is achieved)
 until ping -c1 -w3 google.com || ping -c1 -w3 yahoo.com; do
