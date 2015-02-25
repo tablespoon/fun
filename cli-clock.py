@@ -10,22 +10,23 @@ import os
 
 
 DIGIT_COLOR = "RED"
+VOID_COLOR = "BLACK"
 LETTER_COLOR = "YELLOW"
 PUNCT_COLOR = "YELLOW"
-PAD_WIDTH = 2
+PAD_WIDTH = 1
 
 
 strings = {
-	"0" : "######|##__##|##__##|##__##|######",
-	"1" : "____##|____##|____##|____##|____##",
-	"2" : "######|____##|######|##____|######",
-	"3" : "######|____##|######|____##|######",
-	"4" : "##__##|##__##|######|____##|____##",
-	"5" : "######|##____|######|____##|######",
-	"6" : "######|##____|######|##__##|######",
-	"7" : "######|____##|____##|____##|____##",
+	"0" : "######|##__##|##--##|##__##|######",
+	"1" : "----##|--__##|----##|--__##|----##",
+	"2" : "######|--__##|######|##__--|######",
+	"3" : "######|--__##|######|--__##|######",
+	"4" : "##--##|##__##|######|--__##|----##",
+	"5" : "######|##__--|######|--__##|######",
+	"6" : "######|##__--|######|##__##|######",
+	"7" : "######|--__##|----##|--__##|----##",
 	"8" : "######|##__##|######|##__##|######",
-	"9" : "######|##__##|######|____##|____##",
+	"9" : "######|##__##|######|--__##|----##",
 	"A" : "_AAAA_|AA__AA|AAAAAA|AA__AA|AA__AA",
 	"B" : "AAAAA_|AA__AA|AAAAA_|AA__AA|AAAAAA",
 	"C" : "_AAAA_|AA__AA|AA____|AA__AA|_AAAA_",
@@ -58,7 +59,8 @@ strings = {
 	"!" : "::|::|::|__|::",
 	"." : "__|__|__|__|::",
 	";" : "__|::|__|::|_:",
-	" " : "__|__|__|__|__"
+	" " : "__|__|__|__|__",
+	"~" : "------|--__--|------|--__--|------"
 }
 
 colors = {
@@ -73,6 +75,7 @@ colors = {
 }
 
 DC = "\033[3" + colors[DIGIT_COLOR] + ";4" + colors[DIGIT_COLOR] + "m"
+VC = "\033[9" + colors[VOID_COLOR] + ";10" + colors[VOID_COLOR] + "m"
 LC = "\033[3" + colors[LETTER_COLOR] + ";4" + colors[LETTER_COLOR] + "m"
 PC = "\033[3" + colors[PUNCT_COLOR] + ";4" + colors[PUNCT_COLOR] + "m"
 NC = "\033[0m"
@@ -92,11 +95,12 @@ def initializeStrings():
 		
 		width = str(string.find("|"))
 
-		string = sub("(#+)", DC + r"\1" + NC, string)
-		string = sub("(A+)", LC + r"\1" + NC, string)
-		string = sub("(:+)", PC + r"\1" + NC, string)
-		string = sub("_", " ", string)
-		string = sub("\|", "\033[" + width + "D" + "\033[1B", string) + "\033[4A"
+		string = sub("(#+)", DC + r"\1" + NC, string)	# colorize #'s in digit strings
+		string = sub("(-+)", VC + r"\1" + NC, string)	# colorize -'s (void areas) in digit strings
+		string = sub("(A+)", LC + r"\1" + NC, string)	# colorize A's in letter strings
+		string = sub("(:+)", PC + r"\1" + NC, string)	# colorize :'s in puctuation strings
+		string = sub("_", " ", string)			# replace _'s with spaces
+		string = sub("\|", "\033[" + width + "D" + "\033[1B", string) + "\033[4A" # add cursor movement
 
 		strings[name] = string
 
@@ -120,7 +124,11 @@ def drawClock():
 
 		print "\033[0;0H" + "\033[?25l" # move cursor to 0,0 and hide it
 
-		string = datetime.now().strftime("%I:%M:%S")
+		string = datetime.now().strftime("%I:%M:%S") # 12-hour clock
+		if string[0] == "0":
+			string = "~" + string[1:]
+		#string = datetime.now().strftime("%H:%M:%S") # 24-hour clock
+		print "",
 		for i in list(string):
 			print " " * PAD_WIDTH, 
 			sys.stdout.write(strings[i])

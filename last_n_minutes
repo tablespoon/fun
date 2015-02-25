@@ -48,9 +48,9 @@ proposed_target=$(echo "$(date +%s)-60*$minutes_to_look_back" | bc)
 actual_target=$(
 	tac "$log_file" \
 	| sed -r "$curr_search_replace; $prev_search_replace" \
-	| awk -v t=$proposed_target '{if (mktime($0) < t){print mktime($0); exit}}' \
+	| awk -v t=$proposed_target '{if (mktime($0) < t) {print mktime($0); exit}}' \
 	| xargs -rI{} date -d '@{}' '+%b %e %H:%M:%S'
 )
 
 # stream log backwards printing all lines until target is reached, then re-invert output
-tac $log_file | awk "/^$actual_target/ { exit }; { print }" | tac
+tac $log_file | awk "/^$actual_target/ {exit}; {print}" | tac

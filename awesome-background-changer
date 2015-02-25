@@ -4,6 +4,27 @@ WALLPAPER_DIR=$HOME/Pictures/wallpapers
 SCRIPT_NAME=$(basename $0)
 
 
+setWallpaper() {
+	local image=$1
+	gconftool-2 --type string --set /desktop/gnome/background/picture_filename "$image"
+	gconftool-2 --type string --set /desktop/gnome/background/picture_options zoom
+	gconftool-2 --type bool --set /desktop/gnome/background/draw_background true
+}
+
+
+# set wallpaper and exit if filenamae supplied
+if [[ "$1" ]]; then
+	if [[ -f "$1" ]]; then
+		setWallpaper "$1"
+		exit 0
+	elif [[ -f "$WALLPAPER_DIR/$1" ]]; then
+		setWallpaper "$WALLPAPER_DIR/$1"
+		exit 0
+	fi
+	exit 1
+fi
+
+
 # Ensure only THIS instance of the script is running
 for pid in $(pidof -xo $$ $SCRIPT_NAME 2>/dev/null); do
 	other_pids+=" $(pstree -Apl $pid | sed -r 's/[^)]*\(//g; s/\)/ /g' | xargs echo)"
@@ -20,8 +41,6 @@ while sleep ${delay:-0}; do
 		choice=${wallpapers[$index]}
 	done
 	last=$choice
-	gconftool-2 --type string --set /desktop/gnome/background/picture_filename $WALLPAPER_DIR/$choice
-	gconftool-2 --type string --set /desktop/gnome/background/picture_options zoom
-	gconftool-2 --type bool --set /desktop/gnome/background/draw_background true
+	setWallpaper "$WALLPAPER_DIR/$choice"
 	delay=$(( 3600 - $(date '+60*%M+%S' | bc) ))
 done
