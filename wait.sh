@@ -9,6 +9,7 @@ WAIT_runChild() {
 }
 
 WAIT_jobDone() {
+	trap - SIGHUP
 	wait_output=$(<"$WAIT_SHM_FILE")
 	printf '\r\033[K' 1>&2
 	break 2
@@ -30,7 +31,7 @@ WAIT_waitForHUP() {
 
 WAIT_cleanup() {
 	ps -o ppid,pid $WAIT_child_pid | awk -v parent=$$ '$1==parent { print $2 }' | xargs -r kill 2>/dev/null
-	rm -f "$WAIT_SHM_FILE" &>/dev/null
+	rm -f "$WAIT_SHM_FILE"
 }
 
 WAIT() {
@@ -38,5 +39,4 @@ WAIT() {
 	WAIT_runChild "$1" &
 	WAIT_child_pid=$!
 	WAIT_waitForHUP "$2"
-	WAIT_cleanup
 }
