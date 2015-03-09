@@ -1,42 +1,55 @@
 #!/bin/bash
 
-WAIT_SHM_FILE="/dev/shm/wait_output.$$"
-WAIT_PROGRESS_ANIMATION="\ | / -"
+# Print a message while awaiting completion of a command.
+# by Todd Stein
 
-WAIT_runChild() {
-	$1 &>"$WAIT_SHM_FILE"
+# Command's output is captured in $waitFor_output
+
+# $1 is the command you want to run
+# $2 is the message you want displayed while waiting for $1 to complete
+
+# Example:
+#	waitFor "sleep 5" "Sleeping for 5 seconds..."
+
+
+waitFor_SHM_FILE="/dev/shm/wait_output.$$"
+waitFor_ANIMATION="███▓▒░ ░▒▓"
+
+waitFor_runChild() {
+	$1 &>"$waitFor_SHM_FILE"
 	kill -s SIGHUP $$
 }
 
-WAIT_jobDone() {
+waitFor_jobDone() { # on SIGHUP
 	trap - SIGHUP
-	wait_output=$(<"$WAIT_SHM_FILE")
-	printf '\r\033[K' 1>&2
+	waitFor_output=$(<"$waitFor_SHM_FILE")
+	printf '\r\033[K' 1>&2 # returns cursor to far left and clears the current row
 	break 2
 }
 
-WAIT_waitForHUP() {
-	trap WAIT_jobDone SIGHUP
+waitFor_untilHUP() { # display message until SIGHUP
+	trap waitFor_jobDone SIGHUP
 	local i
 
-	printf "%s " "$@" 1>&2
+	printf "\033[?25l%s  " "$@" 1>&2 # hide cursor and print message
 	while :; do
-		for i in $WAIT_PROGRESS_ANIMATION; do
-			printf "%s" "$i" 1>&2
+		for ((i=0; i<${#waitFor_ANIMATION}; i++)); do
+			local graphic=${waitFor_ANIMATION:$i:1}
+			printf "\b%s" "$graphic" 1>&2
 			sleep .1
-			printf "\b" 1>&2
 		done
 	done
 }
 
-WAIT_cleanup() {
-	ps -o ppid,pid $WAIT_child_pid | awk -v parent=$$ '$1==parent { print $2 }' | xargs -r kill 2>/dev/null
-	rm -f "$WAIT_SHM_FILE"
+waitFor_cleanup() {
+	tput cnorm # show cursor
+	ps -o ppid,pid $waitFor_child_pid | awk -v parent=$$ '$1==parent { print $2 }' | xargs -r kill 2>/dev/null
+	rm -f "$waitFor_SHM_FILE"
 }
 
-WAIT() {
-	trap WAIT_cleanup EXIT
-	WAIT_runChild "$1" &
-	WAIT_child_pid=$!
-	WAIT_waitForHUP "$2"
+waitFor() {
+	trap waitFor_cleanup EXIT
+	waitFor_runChild "$1" &
+	waitFor_child_pid=$!
+	waitFor_untilHUP "$2"
 }
