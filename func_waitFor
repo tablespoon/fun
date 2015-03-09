@@ -42,6 +42,7 @@ waitFor_untilHUP() { # display message until SIGHUP
 }
 
 waitFor_cleanup() {
+	trap - EXIT
 	tput cnorm # show cursor
 	ps -o ppid,pid $waitFor_child_pid | awk -v parent=$$ '$1==parent { print $2 }' | xargs -r kill 2>/dev/null
 	rm -f "$waitFor_SHM_FILE"
@@ -52,4 +53,5 @@ waitFor() {
 	waitFor_runChild "$1" &
 	waitFor_child_pid=$!
 	waitFor_untilHUP "$2"
+	waitFor_cleanup
 }
