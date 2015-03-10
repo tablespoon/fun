@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Print a message while awaiting completion of a command.
+# Print a message while awaiting completion of a command. Command's output is stored in $waitFor_output
 # by Todd Stein
 
 # $1 is the command you want to run
