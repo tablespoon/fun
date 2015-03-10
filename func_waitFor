@@ -40,7 +40,7 @@ waitFor_untilDone() { # display message until SIGHUP
 waitFor_end() {
 	ps -o ppid,pid $waitFor_child_pid | awk -v parent=$$ '$1==parent { print $2 }' | xargs -r kill 2>/dev/null
 	printf '\r\033[K\033[?25h' 1>&2 # returns cursor to far left, clears the current row, and makes the cursor visible again
-	cat "$waitFor_SHM_FILE"
+	waitFor_output=$(<"$waitFor_SHM_FILE")
 	rm -f "$waitFor_SHM_FILE"
 
 	trap - EXIT
