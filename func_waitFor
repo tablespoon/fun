@@ -3,8 +3,6 @@
 # Print a message while awaiting completion of a command.
 # by Todd Stein
 
-# Command's output is captured in $waitFor_output
-
 # $1 is the command you want to run
 # $2 is the message you want displayed while waiting for $1 to complete
 
@@ -12,23 +10,21 @@
 #	waitFor "sleep 5" "Sleeping for 5 seconds..."
 
 
-waitFor_SHM_FILE="/dev/shm/wait_output.$$"
+waitFor_SHM_FILE="/dev/shm/waitFor_output.$$"
 waitFor_ANIMATION="███▓▒░ ░▒▓"
 
 waitFor_runChild() {
 	$1 &>"$waitFor_SHM_FILE"
-	kill -s SIGHUP $$
+	kill -s SIGUSR1 $$
 }
 
-waitFor_jobDone() { # on SIGHUP
-	trap - SIGHUP
-	waitFor_output=$(<"$waitFor_SHM_FILE")
-	printf '\r\033[K' 1>&2 # returns cursor to far left and clears the current row
+waitFor_childDone() { # on SIGHUP
+	trap - SIGUSR1
 	break 2
 }
 
-waitFor_untilHUP() { # display message until SIGHUP
-	trap waitFor_jobDone SIGHUP
+waitFor_untilDone() { # display message until SIGHUP
+	trap waitFor_childDone SIGUSR1
 	local i
 
 	printf "\033[?25l%s  " "$@" 1>&2 # hide cursor and print message
@@ -41,17 +37,19 @@ waitFor_untilHUP() { # display message until SIGHUP
 	done
 }
 
-waitFor_cleanup() {
-	trap - EXIT
-	tput cnorm # show cursor
+waitFor_end() {
 	ps -o ppid,pid $waitFor_child_pid | awk -v parent=$$ '$1==parent { print $2 }' | xargs -r kill 2>/dev/null
+	printf '\r\033[K\033[?25h' 1>&2 # returns cursor to far left, clears the current row, and makes the cursor visible again
+	cat "$waitFor_SHM_FILE"
 	rm -f "$waitFor_SHM_FILE"
+
+	trap - EXIT
 }
 
 waitFor() {
-	trap waitFor_cleanup EXIT
+	trap waitFor_end EXIT
 	waitFor_runChild "$1" &
 	waitFor_child_pid=$!
-	waitFor_untilHUP "$2"
-	waitFor_cleanup
+	waitFor_untilDone "$2"
+	waitFor_end
 }
