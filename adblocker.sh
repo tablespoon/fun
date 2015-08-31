@@ -36,7 +36,8 @@ done &>/dev/null
 [ -s "$BLACKLIST" ] && awk '/^[^#]/ { print "0.0.0.0",$1 }' "$BLACKLIST" >>"$BLOCKLIST"
 
 # grab host lists from the internet
-wget -qO- $HOST_LISTS | sed -rn 's/^(127.0.0.1|0.0.0.0)/0.0.0.0/p' | awk '{ print $1,$2 }' | sort -uk2 >>"$BLOCKLIST"
+IP_REGEX='([0-9]{1,3}\.){3}[0-9]{1,3}'
+wget -qO- $HOST_LISTS | sed -rn "s/^$IP_REGEX\W/0.0.0.0 /p" | awk '{ print $1,$2 }' | sort -uk2 >>"$BLOCKLIST"
 
 # remove any whitelisted domains from the block list
 if [ -s "$WHITELIST" ]; then
@@ -77,7 +78,10 @@ if ! grep -Fq "$SCRIPT_NAME" /etc/rc.local; then
 fi
 
 # add script to root's crontab if it's not already there
+# adds 30 minutes of jitter to prevent undue load on the webservers hosting the lists we pull each week
+# unfortunately, there's no $RANDOM in this shell, so:
+DELAY='$(head /dev/urandom | wc -c | /usr/bin/awk "{ print \$0 % 30 }")m'
 grep -Fq "$SCRIPT_NAME" /etc/crontabs/root 2>/dev/null || cat >>/etc/crontabs/root <<-:EOF:
-	# Download updated ad and malware server lists every Tuesday at 3 AM
-	0 3 * * 2 /bin/sh $SCRIPT_NAME
+	# Download updated ad and malware server lists every Tuesday between 3:00 and 3:30 AM
+	0 3 * * 2 /bin/sleep $DELAY && $SCRIPT_NAME
 :EOF:
