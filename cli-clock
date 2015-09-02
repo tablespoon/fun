@@ -59,7 +59,7 @@ SPACE="__|__|__|__|__"
 NEWLINE="NEWLINE"
 SPACE_WIDTH=2
 LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<$COLON)
-LOCAL_TIMEZONE=$(awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
+LOCAL_TIMEZONE=$([[ -f /etc/sysconfig/clock ]] && awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
 
 
 initStrings() {
