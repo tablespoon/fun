@@ -230,7 +230,7 @@ while sleep ${delay:-0}; do
 	[[ $@ ]] && end
 
 	# determine how long to sleep before the next update
-	#nanoseconds=10#$(date +%N) # removed this super-elegant solution because OSX's bash can't handle it :()
+	#nanoseconds=10#$(date +%N) # removed this super-elegant solution because OSX's bash can't handle it :(
 	nanoseconds=$(date +%N)
 	while [[ $nanoseconds =~ ^0 ]]; do
 		nanoseconds=${nanoseconds:1}
