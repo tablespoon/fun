@@ -11,8 +11,8 @@ Fun scripts from tablespoon
   * you will need to create ~/lib/bluetooth-phone and add "MAC=\<your phone's bluetooth mac address\>" to it for this to work
 * `cli-clock` - make a clock with ANSI art
   * --world : shows multiple clocks with timezone labels
-  * --24hour : displays a 24 hour clock (this is the default)
-  * --12hour : displays a 12 hour clock
+  * --24hour : displays a 24-hour clock (this is the default)
+  * --12hour : displays a 12-hour clock
   * This script can also be used to print strings. For a demonstration, try: ./cli-clock 'Hello, world!'
   * Because of tiny memory leaks in bash, this script will eventually (over the course of weeks/months) begin to lag a little bit. The python re-implementation below doesn't have as many features as this bash version, but it can run indefinitely without any slowdown. I submitted a bug report to the bash devs (https://lists.gnu.org/archive/html/bug-bash/2014-01/msg00012.html), but they didn't seem to think it was worth fixing.
 * `cli-clock.py` - re-implementation of cli-clock using python
