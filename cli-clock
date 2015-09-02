@@ -230,6 +230,7 @@ while sleep ${delay:-0}; do
 	[[ ${@} ]] && end
 
 	# determine how long to sleep before the next update
-	nanoseconds=10#$(date +%N)
+	nanoseconds=$(date +%N)
+	nanoseconds=${nanoseconds#0}
 	delay=0.$(( 1000000000 - ${nanoseconds} ))
 done
