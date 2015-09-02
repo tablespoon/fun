@@ -58,14 +58,14 @@ SEMICOLON="__|::|__|::|_:"
 SPACE="__|__|__|__|__"
 NEWLINE="NEWLINE"
 SPACE_WIDTH=2
-LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<${COLON})
+LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<$COLON)
 LOCAL_TIMEZONE=$(awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
 
 
 initStrings() {
 	local string_name
 	for string_name in {0..9} {A..Z} ':' ',' '!' '.' ';' ' ' '>' $'\n'; do
-		case ${string_name} in
+		case $string_name in
 			[a-z])  string_name=${string_name^^};;
 			:)      string_name=COLON;;
 			,)      string_name=COMMA;;
@@ -76,32 +76,32 @@ initStrings() {
 			'>')	string_name=INDENT;;
 			$'\n')  string_name=NEWLINE;;
 		esac
-		string_names+=("${string_name}")
+		string_names+=("$string_name")
 
 
 		
 		local string
-		if [[ ${string_name} =~ [0-9] ]]; then
-			string=${NUM[${string_name}]}
+		if [[ $string_name =~ [0-9] ]]; then
+			string=${NUM[$string_name]}
 		else
 			string=${!string_name}
 		fi
 
-		local char_width=$(cut -f 1 -d '|' <<<${string})
+		local char_width=$(cut -f 1 -d '|' <<<$string)
 		char_width=${#char_width}
-		char_widths+=("${char_width}")
+		char_widths+=("$char_width")
 
-		local movement='\\e['${char_width}'D\\e[1B'
+		local movement='\\e['$char_width'D\\e[1B'
 
 		# bash has memory leaks when using parameter substitution, so sed is employed instead
-		string=$(sed "s/\(#\+\)/\\${DC}\1\\${NC}/g;\
-			      s/\(A\+\)/\\${LC}\1\\${NC}/g;\
-			      s/\(:\+\)/\\${PC}\1\\${NC}/g;\
+		string=$(sed "s/\(#\+\)/\\$DC\1\\$NC/g;\
+			      s/\(A\+\)/\\$LC\1\\$NC/g;\
+			      s/\(:\+\)/\\$PC\1\\$NC/g;\
 			      s/_/ /g;\
-			      s/|/\\${movement}/g" <<<${string}
+			      s/|/\\$movement/g" <<<${string}
 			)
 		
-		strings+=("${string}")
+		strings+=("$string")
 	done
 }
 
@@ -118,8 +118,8 @@ screenSetup() {
 	cols=${dimensions##*$'\n'}
 
 	# redraw screen if terminal dimensions change
-	if [[ ${dimensions} != ${dimensions_log} ]]; then
-		dimensions_log=${dimensions}
+	if [[ $dimensions != $dimensions_log ]]; then
+		dimensions_log=$dimensions
 		printf "\Ec" # clear terminal
 		tput civis
 	fi
@@ -139,7 +139,7 @@ drawChar() {
 	local char="$1"
 
 	# translate string
-        case ${char} in
+        case $char in
                 [a-z])  char=${char^^};;
                 :)      char=COLON;;
                 ,)      char=COMMA;;
@@ -152,36 +152,36 @@ drawChar() {
         esac
 
 	local i
-	for (( i=0; ${i} < ${#string_names[@]}; i++ )); do
-		if [[ "${string_names[${i}]}" == "${char}" ]]; then
-			local string="${strings[${i}]}"
-			local char_width=${char_widths[${i}]}
+	for (( i=0; i < ${#string_names[@]}; i++ )); do
+		if [[ "${string_names[$i]}" == "$char" ]]; then
+			local string="${strings[$i]}"
+			local char_width=${char_widths[$i]}
 			break
 		fi
 	done
 
 	# newline check
-	if [[ ${char_width} -gt ${space_on_line} || ${string} == "NEWLINE" ]]; then
+	if [[ $char_width -gt $space_on_line || $string == "NEWLINE" ]]; then
 		(( vert_offset+=$(( LINE_HEIGHT + 1 )) ))
 		printf "\E[$(( start_row + vert_offset ));${start_col}f"
 		space_on_line=$(( cols - start_col ))
-		[[ ${string} == "NEWLINE" ]] && return
+		[[ $string == "NEWLINE" ]] && return
 	fi
 
 	# after the formatted character, and move cursor right and up to prepare for next character
-	printf "${string}\e[${SPACE_WIDTH}C\e[4A"
+	printf "$string\e[${SPACE_WIDTH}C\e[4A"
 
 	# keep track of remaining space on the current line
-	(( space_on_line-=$(( ${char_width} + ${SPACE_WIDTH} )) ))
+	(( space_on_line-=$(( $char_width + $SPACE_WIDTH )) ))
 }
 
 
 printString() {
-	local string="${@}"
-	while [[ ${string} ]]; do
-		# print the first character in ${string}
+	local string="$@"
+	while [[ $string ]]; do
+		# print the first character in $string
 		local char="${string:0:1}"
-		drawChar "${char}"
+		drawChar "$char"
 		# remove the character we printed from ${string}
 		string="${string:1}"
 	done
@@ -190,18 +190,18 @@ printString() {
 
 getDate() {
 	local TZ
-	if [[ ! ${@} ]]; then
+	if [[ ! $@ ]]; then
 		local date_string="%I:%M:%S"
-		TZ=${LOCAL_TIMEZONE} date +"${date_string}"
+		TZ=$LOCAL_TIMEZONE date +"$date_string"
 	else
 		local date_string="%H:%M:%S %Z"
-		TZ=${LOCAL_TIMEZONE} date +"${date_string}"
+		TZ=$LOCAL_TIMEZONE date +"$date_string"
 
 		date_string="%I:%M %Z"
 		local i
-		for i in ${@}; do
+		for i in $@; do
 			printf ">"
-			TZ=${i} date +"${date_string}"
+			TZ=$i date +"$date_string"
 		done
 	fi
 }
@@ -209,7 +209,7 @@ getDate() {
 
 end() {
 	# put cursor below any output, make it visibile, and exit
-	printf "\n%.s" $(eval echo {0..${LINE_HEIGHT}})
+	printf "\n%.s" $(eval echo {0..$LINE_HEIGHT})
 	tput cvvis
 	exit
 }
@@ -226,10 +226,14 @@ while sleep ${delay:-0}; do
 
 	date="$(getDate ${TIMEZONES})"
 
-	printString "${@:-${date}}"
-	[[ ${@} ]] && end
+	printString "${@:-$date}"
+	[[ $@ ]] && end
 
 	# determine how long to sleep before the next update
-	nanoseconds=10#$(date +%N)
-	delay=0.$(( 1000000000 - ${nanoseconds} ))
+	#nanoseconds=10#$(date +%N) # removed this super-elegant solution because OSX's bash can't handle it :()
+	nanoseconds=$(date +%N)
+	while [[ $nanoseconds =~ ^0 ]]; do
+		nanoseconds=${nanoseconds:1}
+	done
+	delay=0.$(( 1000000000 - nanoseconds ))
 done
