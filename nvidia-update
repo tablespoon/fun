@@ -1,0 +1,24 @@
+#!/bin/bash
+
+architecture=$(uname -p)
+current_version=$(nvidia-smi | grep -Po '(?<=Driver Version: )[^ ]+')
+download_site=http.download.nvidia.com/XFree86/Linux-$architecture
+latest=$(curl -s $download_site/latest.txt)
+latest_version=${latest% *}
+file=$download_site/${latest#* }
+
+printf "Currently-running version: %s\nLatest-available version:  %s\n\n" "$current_version" "$latest_version"
+
+if [[ $current_version != $latest_version ]]; then
+	read -p "Download update? [y/N]: " answer
+
+	case $answer in
+		y|Y)
+			wget -N $file
+			file=${file##*/}
+			chmod +x $file
+		;;
+	esac
+else
+	printf "Driver is up to date.\n"
+fi
