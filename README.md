@@ -8,7 +8,7 @@ Fun scripts from tablespoon
 * `auto-blockip` - squashes breakin attempts automatically
 * `awesome-background-changer` - randomly select a new wallpaper every hour (gnome 2 only!)
 * `bt-auto-lock` - lock/unlock gnome 2 session based on cell phone proximity
-  * you will need to create ~/lib/bluetooth-phone and add "MAC=<your phone's bluetooth mac address>" to it for this to work
+  * you will need to create ~/lib/bluetooth-phone and add "MAC=\<your phone's bluetooth mac address\>" to it for this to work
 * `cli-clock` - make a clock with ANSI art
   * --world : shows multiple clocks with timezone labels
   * --24hour : displays a 24 hour clock (this is the default)
