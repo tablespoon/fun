@@ -7,7 +7,8 @@ Fun scripts from tablespoon
   * Documentation can be found here: https://www.reddit.com/r/technology/comments/3iy9d2/fcc_rules_block_use_of_open_source/cul12pk
 * `auto-blockip` - squashes breakin attempts automatically
 * `awesome-background-changer` - randomly select a new wallpaper every hour (gnome 2 only!)
-* `bt-auto-lock` - lock/unlock machine based on cell phone proximity
+* `bt-auto-lock` - lock/unlock gnome 2 session based on cell phone proximity
+  * you will need to create ~/lib/bluetooth-phone and add "MAC=<your phone's bluetooth mac address>" to it for this to work
 * `cli-clock` - make a clock with ANSI art
   * Because of tiny memory leaks in bash, this script will eventually (over the course of weeks/months) begin to lag a little bit. The python re-implementation below doesn't have as many features as this bash version, but it can run indefinitely without any slowdown. I submitted a bug report to the bash devs (https://lists.gnu.org/archive/html/bug-bash/2014-01/msg00012.html), but they didn't seem to think it was worth fixing.
 * `cli-clock.py` - re-implementation of cli-clock using python
