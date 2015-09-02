@@ -19,6 +19,6 @@ Fun scripts from tablespoon
 * `cpi` - bash parallel pi estimator
 * `cpi.py` - python pi estimator (not parallel... my bash is stronger than my python)
 * `last_n_minutes` - bash script to print the last N minutes of a standard linux log file
-* `nvidia-update` - check for and optionally download an updated nvidia driver
+* `nvidia-update` - check for (and optionally download) a newer nvidia driver
 
 
