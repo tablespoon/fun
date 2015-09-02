@@ -5,8 +5,6 @@ DIGIT_COLOR=RED
 LETTER_COLOR=YELLOW
 PUNCT_COLOR=YELLOW
 
-#TIMEZONES="America/New_York Europe/London Asia/Baghdad Asia/Singapore Asia/Tokyo"
-
 BLACK=0 RED=1 GREEN=2 YELLOW=3 BLUE=4 MAGENTA=5 CYAN=6 WHITE=7
 DC="\e[3${!DIGIT_COLOR};4${!DIGIT_COLOR}m"
 LC="\e[3${!LETTER_COLOR};4${!LETTER_COLOR}m"
@@ -60,6 +58,30 @@ NEWLINE="NEWLINE"
 SPACE_WIDTH=2
 LINE_HEIGHT=$(awk -F\| '{ print NF }' <<<$COLON)
 LOCAL_TIMEZONE=$([[ -f /etc/sysconfig/clock ]] && awk -F'"' '/ZONE=/ { print $2 }' /etc/sysconfig/clock)
+[[ -n $LOCAL_TIMEZONE ]] || LOCAL_TIMEZONE=America/Los_Angeles
+HOUR=H
+
+
+while [[ $1 ]]; do
+	case $1 in
+		--world)
+			TIMEZONES="America/New_York Europe/London Europe/Paris Asia/Baghdad Asia/Singapore Asia/Tokyo"
+		;;
+
+		--24hour)
+			HOUR=H
+		;;
+
+		--12hour)
+			HOUR=I
+		;;
+
+		*)
+			ARGS="${ARGS+: $ARGS}$1"
+		;;
+	esac
+	shift
+done
 
 
 initStrings() {
@@ -191,13 +213,13 @@ printString() {
 getDate() {
 	local TZ
 	if [[ ! $@ ]]; then
-		local date_string="%I:%M:%S"
+		local date_string="%$HOUR:%M:%S"
 		TZ=$LOCAL_TIMEZONE date +"$date_string"
 	else
-		local date_string="%H:%M:%S %Z"
+		local date_string="%$HOUR:%M:%S %Z"
 		TZ=$LOCAL_TIMEZONE date +"$date_string"
 
-		date_string="%I:%M %Z"
+		date_string="%$HOUR:%M %Z"
 		local i
 		for i in $@; do
 			printf ">"
@@ -226,8 +248,8 @@ while sleep ${delay:-0}; do
 
 	date="$(getDate ${TIMEZONES})"
 
-	printString "${@:-$date}"
-	[[ $@ ]] && end
+	printString "${ARGS:-$date}"
+	[[ $ARGS ]] && end
 
 	# determine how long to sleep before the next update
 	#nanoseconds=10#$(date +%N) # removed this super-elegant solution because OSX's bash can't handle it :(
