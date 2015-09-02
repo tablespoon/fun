@@ -98,7 +98,7 @@ initStrings() {
 			      s/\(A\+\)/\\$LC\1\\$NC/g;\
 			      s/\(:\+\)/\\$PC\1\\$NC/g;\
 			      s/_/ /g;\
-			      s/|/\\$movement/g" <<<${string}
+			      s/|/\\$movement/g" <<<$string
 			)
 		
 		strings+=("$string")
