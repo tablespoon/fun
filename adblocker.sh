@@ -88,7 +88,7 @@ sed -ri 's/([^ ]+)$/\1\n::      \1/' "$BLOCKLIST"
 
 
 # add block list to dnsmasq config if it's not already there
-if ! uci get dhcp.@dnsmasq[0].addnhosts | grep -q "$BLOCKLIST"; then
+if ! uci get dhcp.@dnsmasq[0].addnhosts 2> /dev/null | grep -q "$BLOCKLIST"; then
 	uci add_list dhcp.@dnsmasq[0].addnhosts="$BLOCKLIST" && uci commit
 fi
 
