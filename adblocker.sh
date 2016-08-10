@@ -9,7 +9,7 @@
 
 
 HOST_LISTS="
-	http://adaway.org/hosts.txt
+	http://crossorigin.me/https://adaway.org/hosts.txt
 	http://www.malwaredomainlist.com/hostslist/hosts.txt
 	http://www.mvps.org/winhelp2002/hosts.txt
 	http://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&startdate%5Bday%5D=&startdate%5Bmonth%5D=&star
