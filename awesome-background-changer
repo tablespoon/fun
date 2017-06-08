@@ -42,7 +42,7 @@ done
 cd $WALLPAPER_DIR
 # Main loop
 while sleep ${delay:-0}; do
-	wallpapers=( $(ls | sed 's/ /\\ /g') )
+	wallpapers=( * )
 	while [[ $choice == $last ]]; do
 		index=$(( RANDOM % ${#wallpapers[@]} ))
 		choice=${wallpapers[$index]}
