@@ -1,0 +1,21 @@
+#!/bin/bash
+
+
+POLL_FREQUENCY=1	# attempt to poll this frequently (in seconds)
+SCRIPT_NAME=$(basename $0)
+
+
+# Ensure only THIS instance of the script is running
+for pid in $(pidof -xo $$ $SCRIPT_NAME 2>/dev/null); do
+	other_pids+=" $(pstree -Apl $pid | sed -r 's/[^)]*\(//g; s/\)/ /g' | xargs echo)"
+done
+[[ $other_pids ]] && kill $other_pids &>/dev/null
+
+while true; do
+	checksum=$(md5sum /proc/asound/card0/codec#0)
+	if [[ $checksum != $checksum_old ]]; then
+		toggle-headphones
+		checksum_old=$checksum
+	fi
+	sleep $POLL_FREQUENCY
+done

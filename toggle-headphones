@@ -1,0 +1,50 @@
+#!/bin/bash
+
+enableHeadphones() {
+	sudo /usr/local/sbin/headphones-on.py
+	sudo /usr/local/sbin/headphones-on.py
+	echo on >~/.headphone_state
+}
+
+disableHeadphones() {
+	sudo /usr/local/sbin/headphones-off.py
+	sudo /usr/local/sbin/headphones-off.py
+	echo off >~/.headphone_state
+}
+
+
+if [[ "$(grep Pin-ctls /proc/asound/card0/codec#0 | awk 'NR==3 { print $NF }')" == "OUT" ]]; then
+	jack_state=unplugged
+	disableHeadphones
+else
+	jack_state=plugged
+	enableHeadphones
+fi
+
+exit
+###########################################################
+
+touch ~/.headphone_state
+state=$(< ~/.headphone_state)
+
+case $1 in
+	on)
+		enableHeadphones
+	;;
+
+	off)
+		disableHeadphones
+	;;
+
+	*)
+		case $state in
+			off)
+				enableHeadphones
+			;;
+
+			*)
+				disableHeadphones
+			;;
+		esac
+	;;
+esac

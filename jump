@@ -1,0 +1,10 @@
+#!/bin/bash
+
+#JUMP_HOST=$(quickest-response hpc-login{1,2})
+SUJUMP_HOST=hpc-admin2
+JUMP_HOST=hpc-login3
+#JUMP_HOST=hpc-login1
+
+[[ $(basename $0) == sujump ]] && AS_ROOT=1
+
+exec ssh -AYto 'ConnectTimeout 2' $([[ $AS_ROOT ]] && echo "-l root $SUJUMP_HOST" || echo "$JUMP_HOST") $([[ $@ ]] && { [[ $1 != -- ]] && echo "-q ssh -AYto 'ConnectTimeout 2'"; echo "$@";})

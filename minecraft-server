@@ -1,0 +1,18 @@
+#!/bin/bash
+
+LOCKFILE=/tmp/minecraft_server.lock
+
+if ! ln -s $$ "$LOCKFILE" 2>/dev/null; then
+	former_pid=$(readlink "$LOCKFILE")
+	if [ -e "/proc/$former_pid" ]; then
+		exit
+	fi
+fi
+
+cd ~/.minecraft_server/
+jar_file=$(ls -tr minecraft_server.*.jar | tail -1)
+
+/usr/bin/screen -S minecraft_server -d -m java -server -Xmx1024M -Xms1024M -jar "${jar_file}" nogui
+
+PID=$(screen -ls minecraft_server | grep -Po '[0-9]+(?=\.minecraft_server)')
+ln -sf $PID "$LOCKFILE" 2>/dev/null

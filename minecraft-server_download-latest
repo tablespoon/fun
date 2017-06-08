@@ -1,0 +1,14 @@
+#!/bin/bash
+
+cd ~/.minecraft_server/
+jar_file=$(ls -tr minecraft_server.*.jar | tail -1)
+
+url=$(curl -s -L https://minecraft.net/en/download/server | grep -Po '(?<=<a href=")http[^"]+/minecraft_server(\.|[0-9])+\.jar(?=">)')
+latest_jar=${url##*/}
+
+if [[ $jar_file != $latest_jar ]]; then
+	wget $url
+else
+	echo "Already have latest: $jar_file"
+fi
+
