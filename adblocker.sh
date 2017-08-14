@@ -14,6 +14,8 @@ HOST_LISTS="
 	http://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&startdate%5Bday%5D=&startdate%5Bmonth%5D=&star
 "
 
+BLOCKTMP1=/tmp/adblocker_tmp1
+BLOCKTMP2=/tmp/adblocker_tmp2
 BLOCKLIST=/tmp/adblocker_hostlist
 BLACKLIST=/etc/adblocker_blacklist
 WHITELIST=/etc/adblocker_whitelist
@@ -48,7 +50,11 @@ done &>/dev/null
 
 # grab list of bad domains from the internet
 IP_REGEX='([0-9]{1,3}\.){3}[0-9]{1,3}'
-hosts=$(wget -qO- $HOST_LISTS | awk "/^$IP_REGEX\W/"'{ print "0.0.0.0",$2 }' | sort -uk2)
+wget -qO $BLOCKTMP1 $HOST_LISTS
+cat $BLOCKTMP1 | awk "/^$IP_REGEX\W/"'{ print "0.0.0.0",$2 }' > $BLOCKTMP2
+cat $BLOCKTMP2 | sort -uk2 > $BLOCKTMP1
+hosts=$(cat $BLOCKTMP1)
+rm $BLOCKTMP1 $BLOCKTMP2
 
 
 # if the download succeeded, recreate the blocklist
