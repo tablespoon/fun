@@ -36,7 +36,7 @@ fi
 for pid in $(pidof -xo $$ $SCRIPT_NAME 2>/dev/null); do
 	other_pids+=" $(pstree -Apl $pid | sed -r 's/[^)]*\(//g; s/\)/ /g' | xargs echo)"
 done
-[[ $other_pids ]] && kill $other_pids @>/dev/null
+[[ $other_pids ]] && kill $other_pids 2>/dev/null
 
 
 cd $WALLPAPER_DIR
