@@ -2,7 +2,7 @@
 
 # adblocker.sh - by Todd Stein (toddbstein@gmail.com), Saturday, October 25, 2014
 # for use on routers running OpenWRT firmware
-# updated Monday, December 19, 2016
+# updated Monday, August 14, 2017
 
 # Periodically download lists of known ad and malware servers, and prevents traffic from being sent to them.
 # This is a complete rewrite of a script originally written by teffalump (https://gist.github.com/teffalump/7227752).
@@ -10,7 +10,7 @@
 
 HOST_LISTS="
 	http://www.malwaredomainlist.com/hostslist/hosts.txt
-	http://www.mvps.org/winhelp2002/hosts.txt
+	http://winhelp2002.mvps.org/hosts.txt
 	http://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&startdate%5Bday%5D=&startdate%5Bmonth%5D=&star
 "
 
@@ -46,15 +46,26 @@ until ping -c1 -w3 google.com || ping -c1 -w3 yahoo.com; do
 done &>/dev/null
 
 
-# grab list of bad domains from the internet
+# grab list of bad domains from the internet - written with the intent of using the least memory possible
 IP_REGEX='([0-9]{1,3}\.){3}[0-9]{1,3}'
-hosts=$(wget -qO- $HOST_LISTS | awk "/^$IP_REGEX\W/"'{ print "0.0.0.0",$2 }' | sort -uk2)
+temp_file1=/tmp/adblocker.tmp1
+temp_file2=/tmp/adblocker.tmp2
+>"$temp_file1"
+# download host lists individually so the rest can still be grabbed if one goes offline
+for i in $HOST_LISTS; do
+	# download and immediately sanitize to prevent possibility of redirection attack
+	wget -qO- $i | awk "/^$IP_REGEX\W/"'{ print "0.0.0.0",$2 }' >>"$temp_file1"
+done
+# sort by domain
+sort -uk2 "$temp_file1" >"$temp_file2"
+rm -f "$temp_file1"
 
 
-# if the download succeeded, recreate the blocklist
-if [ -n "$hosts" ]; then
-	# add downloaded domains to a fresh block list
-	printf "%s\n" "$hosts" >"$BLOCKLIST"
+# if the download succeeded, overwrite blocklist
+if [ -s "$temp_file2" ]; then
+	mv -f "$temp_file2" "$BLOCKLIST"
+else
+	rm -f "$temp_file2"
 fi
 
 
@@ -69,32 +80,30 @@ if [ -s "$BLACKLIST" ]; then
 fi
 
 
-# remove any private net IP addresses (just in case)
-# this variable contains a regex which will be used to prevent the blocking of hosts on 192.168.0.0 and 10.0.0.0 networks
-PROTECTED_RANGES='\W(192\.168(\.[0-9]{1,3}){2}|10(\.[0-9]{1,3}){3})$'
-sed -ri "/$PROTECTED_RANGES/d" "$BLOCKLIST"
+if [ -s "$BLOCKLIST" ]; then
+	# remove any private net IP addresses (just in case)
+	# this variable contains a regex which will be used to prevent the blocking of hosts on 192.168.0.0 and 10.0.0.0 networks
+	PROTECTED_RANGES='\W(192\.168(\.[0-9]{1,3}){2}|10(\.[0-9]{1,3}){3})$'
+	sed -ri "/$PROTECTED_RANGES/d" "$BLOCKLIST"
 
 
-# remove any whitelisted domains from the block list
-if [ -s "$WHITELIST" ]; then
-	# create a pipe-delimited list of all non-commented words in whitelist and remove them from the block list
-	white_listed_regex='\W('"$(grep -Eo '^[^#]+' "$WHITELIST" | xargs | tr ' ' '|')"')$'
-	sed -ri "/${white_listed_regex//./\.}/d" "$BLOCKLIST"
+	# remove any whitelisted domains from the block list
+	if [ -s "$WHITELIST" ]; then
+		# create a pipe-delimited list of all non-commented words in whitelist and remove them from the block list
+		white_listed_regex='\W('"$(grep -Eo '^[^#]+' "$WHITELIST" | xargs | tr ' ' '|')"')$'
+		sed -ri "/${white_listed_regex//./\.}/d" "$BLOCKLIST"
+	fi
+
+
+	# add block list to dnsmasq config if it's not already there
+	if ! uci -q get dhcp.@dnsmasq[0].addnhosts | grep -q "$BLOCKLIST"; then
+		uci add_list dhcp.@dnsmasq[0].addnhosts="$BLOCKLIST" && uci commit
+	fi
+
+
+	# restart dnsmasq service
+	/etc/init.d/dnsmasq restart
 fi
-
-
-# add IPv6 blocking
-sed -ri 's/([^ ]+)$/\1\n::      \1/' "$BLOCKLIST"
-
-
-# add block list to dnsmasq config if it's not already there
-if ! uci -q get dhcp.@dnsmasq[0].addnhosts | grep -q "$BLOCKLIST"; then
-	uci add_list dhcp.@dnsmasq[0].addnhosts="$BLOCKLIST" && uci commit
-fi
-
-
-# restart dnsmasq service
-/etc/init.d/dnsmasq restart
 
 
 # carefully add script to /etc/rc.local if it's not already there
