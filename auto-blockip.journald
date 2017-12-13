@@ -1,0 +1,167 @@
+#!/bin/bash
+
+# by Todd Stein
+# Monday, May 05 2014
+# Automatically blocks nasty IP addresses
+
+# adapted for journald and firewalld on Dec 12, 2017
+
+
+# PATH definition is required for successful cron invocation
+PATH=$HOME/bin:/usr/local/install/xcat/bin:/usr/local/bin:/usr/bin:/sbin:/bin:$PATH
+
+
+MAX_ALLOWED_FAILURES=5		# more than this many failed logins = ban
+LOOK_BACK=5			# number of minutes to search back through /var/log/secure for auth failures
+MOLE_LIMIT=5			# on the Nth ip from the same /24, the whole subnet will be blocked instead; whack-a-mole bad.
+EMAIL_ADDRESS=tbs@usc.edu	# email will be sent here
+COUNTRY_FILE=/tmp/$(basename $0)_country_codes		# used for country name lookups
+LOG_FILE=/tmp/$(basename $0)_block_log			# log ip blocks here -- existing entries won't be blocked again
+#WHITELIST="68.181|128.125|10.125|10.126|192.168"	# pipe-delimited list of whitelisted ip address prefixes
+
+
+# initialize $LOG_FILE if necessary
+[ -f "$LOG_FILE" ] || >"$LOG_FILE"
+
+# download country database if necessary
+[ -f "$COUNTRY_FILE" ] || curl -s http://www.geonames.org/countries/ >"$COUNTRY_FILE"
+
+
+blockIP() { # input is a string
+	local ip=$1
+
+	# this will be used to count how many attacks from the same /24 have occurred
+	local escaped_ip="${ip//./\.}"
+	local same_subnet_match_string="^rule family=\"ipv4\" source address=\"${escaped_ip%.*}\.[0-9]{1,3}\" reject$"
+
+	# if we've seen fewer than $MOLE_LIMIT attackers from this /24
+	if [[ $(firewall-cmd --list-rich-rules | egrep -c "$same_subnet_match_string") -lt $MOLE_LIMIT ]]; then
+		# we only want to block the IP
+		local ip_search_string="^rule family=\"ipv4\" source address=\"($escaped_ip|${escaped_ip%.*}.0/24)\" reject$"
+		local command="
+			if ! firewall-cmd --list-rich-rules | egrep -q \"$ip_search_string\"; then
+				firewall-cmd --add-rich-rule=\"rule family='ipv4' source address='$ip' reject\"
+			fi
+		"
+	else
+		# we want to block the whole subnet
+		subnet="${ip%.*}.0/24"
+		local subnet_search_string="^rule family=\"ipv4\" source address=\"${subnet//./\.}\" reject$"
+		local command="
+			if ! firewall-cmd --list-rich-rules | egrep -q \"$subnet_search_string\"; then
+				firewall-cmd --add-rich-rule=\"rule family='ipv4' source address='$subnet' reject\"
+			fi
+		"
+	fi
+
+	# block it!
+	eval "$command"
+
+	# if we're on an xcat-managed cluster, block $ip on all heanodes, too
+	which psh &>/dev/null && psh headnodes "$command"
+
+	# log that we blocked
+	printf "%s\t%s\n" "$(date '+%b %d %H:%M:%S')" "${subnet:-$ip}" >>"$LOG_FILE"
+}
+
+
+getIPandFQDN() { # input is a string
+	local host=$1
+
+	# if $host is already an IP address
+	if [[ $host =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+		ip=$host
+		fqdn=$(host $host | awk '/domain name pointer/ {print $NF; exit}')
+	else
+		fqdn=$host
+		ip=$(host $host | grep 'has address' | egrep -om1 '([0-9]{1,3}\.){3}[0-9]{1,3}$')
+	fi
+}
+
+
+getWhoisAndCountry() { # input is an ip address
+	local host=$1
+
+	sleep 1 # be respectful of the whois server
+	whois=$(whois $host)
+
+	# try to determine country code
+	local country_code=$(printf "%s\n" "$whois" | egrep -im1 'country(-code)?:')
+	if [[ -z $country_code ]]; then # if whois didn't return real info for $host, try querying the network handle instead
+		local handle=$(printf "%s\n" "$whois" | grep -v '^#' | egrep -om1 '\(.+\)' | egrep -o '[^()]+')
+		sleep 1 # be respectful of the whois server
+		local whois_2nd=$(whois $handle)
+		country_code=$(printf "%s\n" "$whois_2nd" | egrep -im1 'country(-code)?:')
+		[[ -n $country_code ]] && whois="$whois_2nd"
+	fi
+
+	# remove any formatting that could cause the email contents to be sent as an attachment instead of inline
+	# it seems to be caused by a carriage return or vertical tab or something else in [:space:] but not [:blank:]
+	whois="$(printf "%s\n" "$whois" | sed -r 's/[^[:blank:][:graph:]]//g')"
+
+	# extract the actuall country code from the line. the final egrep is required sometimes, presumably because of hidden characters.
+	country_code=$(printf "%s\n" "$country_code" | awk -F'[ :]+' '{print toupper($NF)}' | egrep -o "[A-Z]+")
+
+	# translate the code to an actual name.
+	country=$(grep "name=\"$country_code\"" "$COUNTRY_FILE" | egrep -o 'href="[^"]+">([^<]+)' | sed -r 's/.+>//')
+}
+
+
+sendMail() { # no input
+
+	# if we blocked a subnet
+	if [[ $subnet ]]; then
+		subject="Squashed breakin attempts from $subnet${country:+ ($country)}"
+		heading="An attack was detected from $ip${fqdn:+ ($fqdn)}, and all packets from $subnet are now being dropped by $HOSTNAME as a result. There have been at least $MOLE_LIMIT breach attempts from this /24, so a larger mallet has been employed. The following lines provide information about the remote host, as well as a recent history of communications from it. The last ${LOOK_BACK} minutes of the log were used to determine that the activity was malevolent."
+	else
+		subject="Squashed breakin attempt from $ip${country:+ ($country)}"
+		heading="Packets from $ip${fqdn:+ ($fqdn)} are now being dropped by $HOSTNAME. The following lines provide information about the remote host, as well as a recent history of communications from it. The last ${LOOK_BACK} minutes of the log were used to determine that the activity was malevolent."
+	fi
+
+	body="$(printf "%s\n\n\n%s\n\n\n%s" "$heading" "$whois" "$log")"
+	body="$heading\n\n\n$whois\n\n\n$log"
+
+	(
+		echo "From: cron@$HOSTNAME"
+		echo "To: ${EMAIL_ADDRESS}"
+		echo "Subject: ${subject}"
+		echo "Content-Type: text/html"
+		echo "MIME-Version: 1.0"
+		echo ""
+		echo "${body}"
+	) | /usr/sbin/sendmail -t
+}
+
+
+# generate list of possible attackers
+attackers=$(last_n_minutes.journald $LOOK_BACK | egrep 'sshd\[[0-9]+\]:.*(Failed password|Invalid user)' | egrep -o '\bfrom ([0-9]{1,3}\.){3}[0-9]{1,3}\b' | sort | uniq -c | sort -nr | awk -v m=$MAX_ALLOWED_FAILURES -F '[= ]+' '{if ($2>m) {print $NF} else {exit}}')
+
+
+for rhost in $attackers; do
+
+	unset ip fqdn whois country
+
+	# set $ip and $fqdn
+	getIPandFQDN $rhost
+
+	# ensure $ip is not in USC address space and/or $fqdn doesn't end in .usc.edu. Ensure it's not a cluster machine.
+	egrep -q "\b(${rhost//./\.}|${ip//./\.})\b" /etc/hosts || \
+	[[ $fqdn =~ \.usc\.edu$ ]] || \
+	[[ $WHITELIST && $ip =~ ^(${WHITELIST//./\.}) ]]
+	[[ $? == 0 ]] && continue
+
+	# ensure the attacker is not already blocked, preventing multiple blocks
+	escaped_ip="${ip//./\.}"
+	firewall-cmd --list-rich-rules | grep -Eq "^rule family=\"ipv4\" source address=\"($escaped_ip|${escaped_ip%.*}.0/24)\" reject$"
+	if [[ $? != 0 ]]; then
+		blockIP $ip
+
+		# grab full secure history of $rhost
+		log=$(last_n_minutes.journald $LOOK_BACK | grep -E "\b${rhost//./\.}\b")
+
+		# set $whois and $country
+		getWhoisAndCountry $ip
+
+		sendMail
+	fi
+done
