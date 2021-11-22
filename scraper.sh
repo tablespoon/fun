@@ -40,7 +40,7 @@ while true; do
 
 		# if we can't find the string after VERIFICATION_RETRIES, send alert
 		retry_counter=0
-		while ! curl -s --compressed -A "$USER_AGENT" "${sites[$i]}" | grep -q "${strings[$i]}"; do
+		while ! grep -q "${strings[$i]}" <<<"$(curl -s --compressed -A "$USER_AGENT" "${sites[$i]}")"; do
 
 			if [[ $retry_counter -eq $VERIFICATION_RETRIES ]]; then
 				notification_sent[$i]="yes"
