@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # This script should only be used to see how many valid options remained after completing a Worldle puzzle.
-# This can also be used to cheat, but doing so only cheats yourself. We all know you're better than that.
+# This can also be used to cheat, but doing so only cheats yourself.
 
 file=solution_set
 
