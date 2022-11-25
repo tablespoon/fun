@@ -36,10 +36,10 @@ words=$(grep -E "^$word$" "$file")
 # remove words containing eliminated letters if any have been declared
 [[ $eliminated ]] && words=$(grep -v "[${eliminated}]" <<<"$words")
 
-# get unique list of known yellows
+# get list of unique yellows
 yellows=$(sed 's/./&\n/g' <<<${yellow[@]} | sort -u)
 
-# remove words that don't contain known yellows
+# discard words that don't include the known yellows
 for letter in $yellows; do
 	words=$(grep $letter <<<"$words")
 done
