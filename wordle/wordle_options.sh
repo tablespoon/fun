@@ -5,7 +5,7 @@
 
 file=solution_set
 
-# parse and process arguments
+# process arguments
 for clue in ${@}; do
 	color=${clue:0:1}
 	position=${clue:1:1}
@@ -19,7 +19,7 @@ for clue in ${@}; do
 
 done
 
-# compile regex from what we know about each position
+# compile regex from knowledge of each position
 for ((i=1; i<=$(wc -L <$file); i++)); do
 	if [[ ${green[$i]} ]]; then
 		word+=${green[$i]}
@@ -30,7 +30,7 @@ for ((i=1; i<=$(wc -L <$file); i++)); do
 	fi
 done
 
-# build initial wordlist
+# get initial wordlist
 words=$(grep -E "^$word$" "$file")
 
 # remove words containing any eliminated letters
