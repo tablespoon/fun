@@ -22,18 +22,19 @@ done
 # compile regex from what we know about each position
 for ((i=1; i<=$(wc -L <$file); i++)); do
 	if [[ ${green[$i]} ]]; then
-		word[$i]=${green[$i]}
+		word+=${green[$i]}
 	elif [[ ${yellow[$i]} ]]; then
-		word[$i]=[^${yellow[$i]}]
+		word+=[^${yellow[$i]}]
 	else
-		word[$i]=.
+		word+=.
 	fi
 done
-word=${word[@]} 
-word=${word// /}
 
-# build initial wordlist - remove words with eliminated letters and grab words that match regex from remaining set
-words=$(grep -v "[${eliminated:- }]" $file | grep -E "^$word$")
+# build initial wordlist
+words=$(grep -E "^$word$" "$file")
+
+# remove words containing eliminated letters if any have been declared
+[[ $eliminated ]] && words=$(grep -v "[${eliminated}]" <<<"$words")
 
 # get unique list of known yellows
 yellows=$(sed 's/./&\n/g' <<<${yellow[@]} | sort -u)
@@ -43,4 +44,5 @@ for letter in $yellows; do
 	words=$(grep $letter <<<"$words")
 done
 
+# print matches
 echo "$words"
