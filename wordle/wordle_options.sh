@@ -9,11 +9,11 @@ file=solution_set
 for clue in ${@}; do
 	color=${clue:0:1}
 	position=${clue:1:1}
-	letter=${clue:2}
+	value=${clue:2}
 
 	case $color in
-		g) green[$position]=$letter;;
-		y) yellow[$position]+=$letter;;
+		g) green[$position]=$value;;
+		y) yellow[$position]+=$value;;
 		x) eliminated+=${clue:1};;
 	esac
 
@@ -25,7 +25,6 @@ for ((i=1; i<=$(wc -L <$file); i++)); do
 		word[$i]=${green[$i]}
 	elif [[ ${yellow[$i]} ]]; then
 		word[$i]=[^${yellow[$i]}]
-		yellows+=${yellow[$i]}
 	else
 		word[$i]=.
 	fi
@@ -36,12 +35,12 @@ word=${word// /}
 # build initial wordlist - remove words with eliminated letters and grab words that match regex from remaining set
 words=$(grep -v "[${eliminated:- }]" $file | grep -E "^$word$")
 
-# get unique list of yellows
-yellows=$(sed 's/./&\n/g' <<<$yellows | sort -u)
+# get unique list of known yellows
+yellows=$(sed 's/./&\n/g' <<<${yellow[@]} | sort -u)
 
-# remove words that don't contain all yellows
-for i in $yellows; do
-	words=$(grep ${i} <<<"$words")
+# remove words that don't contain known yellows
+for letter in $yellows; do
+	words=$(grep $letter <<<"$words")
 done
 
 echo "$words"
