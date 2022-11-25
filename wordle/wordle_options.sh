@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-file=words
+# This script should only be used to see how many valid options remained after completing a Worldle puzzle.
+# This can also be used to cheat, but doing so only cheats yourself. We all know you're better than that.
+
+file=solution_set
 
 # parse and process arguments
 for clue in ${@}; do
@@ -31,7 +34,7 @@ word=${word[@]}
 word=${word// /}
 
 # build initial wordlist - remove words with eliminated letters and grab words that match regex from remaining set
-words=$(grep -v "[$eliminated]" $file | grep -E "^$word$")
+words=$(grep -v "[${eliminated:- }]" $file | grep -E "^$word$")
 
 # get unique list of yellows
 yellows=$(sed 's/./&\n/g' <<<$yellows | sort -u)
