@@ -33,7 +33,7 @@ done
 # build initial wordlist
 words=$(grep -E "^$word$" "$file")
 
-# remove words containing eliminated letters if any have been declared
+# remove words containing any eliminated letters
 [[ $eliminated ]] && words=$(grep -v "[${eliminated}]" <<<"$words")
 
 # get list of unique yellows
