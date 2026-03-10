@@ -8,12 +8,12 @@ from datetime import datetime
 import os
 
 
-
-DIGIT_COLOR = "RED"
+CLOCK_STYLE = 24
+DIGIT_COLOR = "CYAN"
 VOID_COLOR = "BLACK"
 LETTER_COLOR = "YELLOW"
 PUNCT_COLOR = "YELLOW"
-PAD_WIDTH = 1
+PAD_WIDTH = 0
 
 
 strings = {
@@ -75,7 +75,8 @@ colors = {
 }
 
 DC = "\033[3" + colors[DIGIT_COLOR] + ";4" + colors[DIGIT_COLOR] + "m"
-VC = "\033[9" + colors[VOID_COLOR] + ";10" + colors[VOID_COLOR] + "m"
+#VC = "\033[9" + colors[VOID_COLOR] + ";10" + colors[VOID_COLOR] + "m"
+VC = "\033[38;5;234m\033[48;5;234m"
 LC = "\033[3" + colors[LETTER_COLOR] + ";4" + colors[LETTER_COLOR] + "m"
 PC = "\033[3" + colors[PUNCT_COLOR] + ";4" + colors[PUNCT_COLOR] + "m"
 NC = "\033[0m"
@@ -86,12 +87,12 @@ def clear():
 
 
 def exit(signal, frame):
-	print "\033[5B" + "\033[?25h", # move cursor below clock and make it reappear
-        sys.exit(0)
+	print("\033[5B" + "\033[?25h", end=' ') # move cursor below clock and make it reappear
+	sys.exit(0)
 
 
 def initializeStrings():
-	for name, string in strings.iteritems():
+	for name, string in strings.items():
 		
 		width = str(string.find("|"))
 
@@ -122,15 +123,19 @@ def drawClock():
 			terminalSize_log = terminalSize_cur
 			clear()
 
-		print "\033[0;0H" + "\033[?25l" # move cursor to 0,0 and hide it
+		print("\033[0;0H" + "\033[?25l") # move cursor to 0,0 and hide it
 
-		string = datetime.now().strftime("%I:%M:%S") # 12-hour clock
-		if string[0] == "0":
-			string = "~" + string[1:]
-		#string = datetime.now().strftime("%H:%M:%S") # 24-hour clock
-		print "",
+		if CLOCK_STYLE == 12:
+			string = datetime.now().strftime("%I:%M") # 12-hour clock
+			#string = datetime.now().strftime("%I:%M:%S") # 12-hour clock
+			if string[0] == "0":
+				string = "~" + string[1:]
+		if CLOCK_STYLE == 24:
+			string = datetime.now().strftime("%H:%M") # 24-hour clock
+			#string = datetime.now().strftime("%H:%M:%S") # 24-hour clock
+		print("", end=' ')
 		for i in list(string):
-			print " " * PAD_WIDTH, 
+			print(" " * PAD_WIDTH, end=' ') 
 			sys.stdout.write(strings[i])
 		sys.stdout.flush()
 
@@ -140,3 +145,4 @@ def drawClock():
 signal.signal(signal.SIGINT, exit)
 initializeStrings()
 drawClock()
+
