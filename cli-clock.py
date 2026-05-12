@@ -83,7 +83,7 @@ NC = "\033[0m"
 
 
 def clear():
-	os.system('cls' if os.name=='nt' else 'printf "\Ec"')
+	os.system('cls' if os.name=='nt' else 'printf "\\Ec"')
 
 
 def exit(signal, frame):
@@ -101,7 +101,7 @@ def initializeStrings():
 		string = sub("(A+)", LC + r"\1" + NC, string)	# colorize A's in letter strings
 		string = sub("(:+)", PC + r"\1" + NC, string)	# colorize :'s in puctuation strings
 		string = sub("_", " ", string)			# replace _'s with spaces
-		string = sub("\|", "\033[" + width + "D" + "\033[1B", string) + "\033[4A" # add cursor movement
+		string = sub("\\|", "\033[" + width + "D" + "\033[1B", string) + "\033[4A" # add cursor movement
 
 		strings[name] = string
 
